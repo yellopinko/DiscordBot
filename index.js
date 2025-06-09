@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 // discord.js 라이브러리에서 필요한 클래스들을 불러옵니다.
-const { Client, IntentsBitField, Partials, EmbedBuilder } = require('discord.js');
+const { Client, IntentsBitField, Partials, EmbedBuilder, PermissionsBitField } = require('discord.js');
 
 // Discord 클라이언트(봇)를 생성하고 봇이 어떤 이벤트(정보)를 받을지 '인텐트'를 설정합니다.
 const client = new Client({
@@ -319,6 +319,11 @@ client.on('messageCreate', async message => {
     // 명령어와 인수를 분리 (큰따옴표 안의 공백도 하나의 인수로 처리)
     const args = message.content.slice(PREFIX.length).trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
     const command = args.shift().toLowerCase();
+
+    // 관리자 권한 확인 함수 (여기에 정의되어 있어야 합니다)
+    const hasAdminPermission = (member) => {
+        return member.permissions.has(PermissionsBitField.Flags.Administrator);
+    };
 
     // !역할메시지 명령어
     if (command === '역할메시지') {
