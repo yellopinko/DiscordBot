@@ -40,7 +40,7 @@ const INVITE_TRACKER_FILE = path.join(__dirname, 'inviteTracker.json');
 
 // 전역 변수 (봇이 재시작되어도 유지되어야 하는 데이터)
 let reactionRoles = {}; // { "guildId": { "messageId": [{ emoji: "...", roleId: "..." }] } }
-let settings = {};      // { "guildId": { "welcomeMessageEnabled": false, "welcomeMessageContent": "...", "inviteTrackingEnabled": false, "logChannelId": "..." } }
+let settings = {};      // { "guildId": { "welcomeMessageEnabled": false, "welcomeMessageContent": "...", "inviteTrackingEnabled": false, "logChannelId": "...", "memberCountInTitle": true } }
 let inviteTracker = {}; // { "guildId": { "inviteCode": { "uses": 0, "inviterId": "..." } } }
 
 
@@ -202,7 +202,6 @@ client.on('guildMemberAdd', async member => {
 
     let inviterTag = '알 수 없음';
     let inviterMention = '알 수 없음';
-    let inviterThumbnail = null; // 초대자 프로필 이미지
 
     if (guildSettings.inviteTrackingEnabled) {
         try {
@@ -231,7 +230,6 @@ client.on('guildMemberAdd', async member => {
             if (foundInviter) {
                 inviterTag = foundInviter.tag;
                 inviterMention = `<@${foundInviter.id}>`;
-                inviterThumbnail = foundInviter.displayAvatarURL({ dynamic: true });
             } else {
                 inviterTag = '초대자를 찾을 수 없음';
                 inviterMention = '초대자를 찾을 수 없음';
@@ -244,24 +242,40 @@ client.on('guildMemberAdd', async member => {
         }
     }
 
-    // 환영 메시지 내용 (사용자 지정 멘트 또는 기본 멘트)
-    const welcomeContent = guildSettings.welcomeMessageContent || `환영합니다!`; // 기본 멘트
-    const finalWelcomeMessage = welcomeContent.replace(/{user}/g, `<@${member.user.id}>`).replace(/{tag}/g, member.user.tag);
-
-
     const welcomeEmbed = new EmbedBuilder()
-        .setColor(0x00FF00)
-        // 이미지와 같은 제목 형식 (53번째 멤버가 입장했어요)
-        .setTitle(`${guild.memberCount}번째 멤버가 입장했어요`)
-        // 이미지와 같은 유저 정보와 멘션
-        .setDescription(`유저 ${member.user.tag} (<@${member.user.id}>)`)
+        .setColor(0x00FF00) // 기본 색상 유지 (아래 푸터에서 변경)
+        // '몇 번째 멤버' 기능
+        .setTitle(guildSettings.memberCountInTitle ? `${guild.memberCount}번째 멤버가 입장했어요` : (guildSettings.welcomeMessageContent || '새로운 멤버가 입장했어요!'))
+        // '유저' 칸 볼드 처리 및 맨 위로 올리기
+        .setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        // 초대자 정보를 필드로 추가 (이미지처럼)
+        // 서버에 입장한 시간과 계정 생성일 다시 추가
         .addFields(
-            { name: '초대자', value: `${inviterTag} (${inviterMention})`, inline: false }
+            { name: '서버에 입장한 시간', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: true },
+            { name: '계정 생성일', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>`, inline: true }
         )
         .setTimestamp() // 타임스탬프는 유지하되, 필드로는 표시 안함
-        .setFooter({ text: `환영합니다!`, iconURL: guild.iconURL() || client.user.displayAvatarURL() }); // 푸터는 간략하게
+        // 푸터 색상 연보라색 (bf8eef)으로 변경
+        .setFooter({ text: '환영합니다!', iconURL: guild.iconURL() || client.user.displayAvatarURL() });
+
+    // 초대자 기능 활성화 시에만 초대자 섹션 추가
+    if (guildSettings.inviteTrackingEnabled) {
+        welcomeEmbed.addFields(
+            { name: '초대자', value: `${inviterTag} (${inviterMention})`, inline: false }
+        );
+    }
+    
+    // 입장 멘트 수정 기능이 활성화되고, 내용이 있을 경우 Description을 덮어씁니다.
+    if (guildSettings.welcomeMessageContent && !guildSettings.memberCountInTitle) {
+        const customWelcomeText = guildSettings.welcomeMessageContent
+            .replace(/{user}/g, `<@${member.user.id}>`)
+            .replace(/{tag}/g, member.user.tag);
+        welcomeEmbed.setDescription(customWelcomeText);
+    }
+
+
+    // 푸터 색상을 연보라색 (bf8eef)으로 변경
+    welcomeEmbed.setColor(0xBF8EEF); // 16진수 값으로 설정
 
     try {
         await logChannel.send({ embeds: [welcomeEmbed] });
@@ -297,18 +311,19 @@ client.on('messageCreate', async message => {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
-        // 인자 파싱: 채널ID, 이모지, 역할ID 또는 역할이름
+        // 인자 파싱: 채널ID, 이모지, 역할ID 또는 역할이름 또는 역할멘션
         const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, '')); // 큰따옴표 제거
         const channelId = parsedArgs[0];
         const emojiInput = parsedArgs[1];
-        const roleIdentifier = parsedArgs[2]; // 역할 ID 또는 역할 이름
+        const roleIdentifier = parsedArgs[2]; // 역할 ID, 역할 이름, 또는 역할 멘션 (<@&ID>)
 
-        // 인수 개수 확인 (채널ID, 이모지, 역할ID/이름)
+        // 인수 개수 확인 (채널ID, 이모지, 역할ID/이름/멘션)
         if (parsedArgs.length < 3) {
             return message.reply(
-                '❌ 사용법: `!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름>`\n' +
+                '❌ 사용법: `!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름 또는 @역할멘션>`\n' +
                 '예시: `!역할메시지 #규칙 👍 123456789012345678`\n' +
-                '예시: `!역할메시지 123456789012345678 🧡 구독자`'
+                '예시: `!역할메시지 123456789012345678 🧡 구독자`\n' +
+                '예시: `!역할메시지 #공지사항 ✅ @관리자`'
             );
         }
 
@@ -318,14 +333,22 @@ client.on('messageCreate', async message => {
                 return message.reply('❌ 유효한 텍스트 채널 ID를 제공해주세요.');
             }
 
-            // 역할 ID 또는 역할 이름으로 역할 찾기
-            let role = message.guild.roles.cache.get(roleIdentifier); // 먼저 ID로 찾아봄
-            if (!role) {
-                role = message.guild.roles.cache.find(r => r.name === roleIdentifier); // ID로 못 찾으면 이름으로 찾아봄
-            }
+            // 역할 ID, 역할 이름, 또는 역할 멘션으로 역할 찾기
+            let role = null;
+            const roleMentionMatch = roleIdentifier.match(/^<@&(\d+)>$/); // 역할 멘션 형식 확인
 
+            if (roleMentionMatch) { // 역할 멘션인 경우
+                const mentionedRoleId = roleMentionMatch[1];
+                role = message.guild.roles.cache.get(mentionedRoleId);
+            } else { // ID 또는 이름인 경우
+                role = message.guild.roles.cache.get(roleIdentifier); // 먼저 ID로 찾아봄
+                if (!role) {
+                    role = message.guild.roles.cache.find(r => r.name === roleIdentifier); // ID로 못 찾으면 이름으로 찾아봄
+                }
+            }
+            
             if (!role) {
-                return message.reply(`❌ 유효한 역할 ID 또는 역할 이름 ('${roleIdentifier}')을 찾을 수 없습니다.`);
+                return message.reply(`❌ 유효한 역할 ID, 역할 이름, 또는 @역할멘션 ('${roleIdentifier}')을 찾을 수 없습니다.`);
             }
 
             // 봇의 역할이 부여하려는 역할보다 높은지 확인
@@ -384,7 +407,7 @@ client.on('messageCreate', async message => {
             message.reply('❌ 역할 메시지를 설정하는 중 오류가 발생했습니다. ID와 권한을 확인해주세요.');
         }
     }
-    // !입장멘트 활성화/비활성화
+    // !입장멘트 활성화/비활성화 (여기서는 환영 메시지 기능의 전체 활성화/비활성화)
     else if (command === '입장멘트') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
@@ -410,7 +433,7 @@ client.on('messageCreate', async message => {
             return message.reply('❌ 유효한 옵션이 아닙니다. `활성화` 또는 `비활성화`를 사용해주세요.');
         }
     }
-    // !입장멘트수정 <새 멘트> 명령어 복구
+    // !입장멘트수정 <새 멘트> 명령어 (몇 번째 멤버 끄고, 관리자가 지정한 멘트 표시)
     else if (command === '입장멘트수정') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
@@ -418,13 +441,23 @@ client.on('messageCreate', async message => {
 
         const newContent = args.join(' ').trim();
         if (newContent.length === 0) {
-            return message.reply('❌ 사용법: `!입장멘트수정 <새로운 입장 멘트>`\n`{user}`는 멤버 멘션, `{tag}`는 멤버 태그로 대체됩니다.');
+            return message.reply('❌ 사용법: `!입장멘트수정 <새로운 입장 멘트 또는 "몇번째">`\n' +
+                                 '`{user}`는 멤버 멘션, `{tag}`는 멤버 태그로 대체됩니다.\n' +
+                                 '`"몇번째"`를 입력하면 몇 번째 멤버 기능이 활성화됩니다.');
         }
 
         if (!settings[guildId]) settings[guildId] = {};
-        settings[guildId].welcomeMessageContent = newContent;
+        
+        if (newContent.toLowerCase() === '몇번째') {
+            settings[guildId].memberCountInTitle = true;
+            settings[guildId].welcomeMessageContent = null; // 커스텀 멘트 비활성화
+            message.reply('✅ 입장 로그 제목이 `N번째 멤버가 입장했어요`로 표시됩니다.');
+        } else {
+            settings[guildId].memberCountInTitle = false;
+            settings[guildId].welcomeMessageContent = newContent;
+            message.reply(`✅ 입장 멘트가 다음과 같이 수정되었습니다:\n\`\`\`${newContent}\`\`\`\n(예: ${newContent.replace(/{user}/g, message.author.toString()).replace(/{tag}/g, message.author.tag)})`);
+        }
         saveSettings();
-        message.reply(`✅ 입장 멘트가 다음과 같이 수정되었습니다:\n\`\`\`${newContent}\`\`\`\n(예: ${newContent.replace(/{user}/g, message.author.toString()).replace(/{tag}/g, message.author.tag)})`);
     }
     // !초대자기능 활성화/비활성화
     else if (command === '초대자기능') {
@@ -465,7 +498,7 @@ client.on('messageCreate', async message => {
             if (!settings[guildId]) settings[guildId] = {};
             settings[guildId].inviteTrackingEnabled = false;
             saveSettings();
-            message.reply('✅ 초대자 추적 기능이 비활성화되었습니다.');
+            message.reply('✅ 초대자 추적 기능이 비활성화되었습니다. 입장 로그에 초대자 정보가 표시되지 않습니다.');
         } else {
             return message.reply('❌ 유효한 옵션이 아닙니다. `활성화` 또는 `비활성화`를 사용해주세요.');
         }
@@ -497,22 +530,25 @@ client.on('messageCreate', async message => {
     else if (command === 'help') {
         const helpEmbed = new EmbedBuilder()
             .setColor(0x0099FF)
-            .setTitle('봇 사용법')
-            .setDescription('안녕하세요! 저는 서버 관리에 도움을 드리는 봇입니다.')
+            .setTitle('봇 명령어 도움말')
+            .setDescription('안녕하세요! 저는 갈래의 보금자리 지킴이 입니다')
             .addFields(
                 {
                     name: '💜 반응 역할 명령어',
-                    value: '`!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름>`\n' +
+                    value: '`!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름 또는 @역할멘션>`\n' +
                            '  └ 새로운 임베드 메시지를 생성하고, 지정된 이모지에 반응하면 역할을 부여합니다.\n' +
                            '  └ 예: `!역할메시지 #규칙 👍 123456789012345678`\n' +
-                           '  └ 예: `!역할메시지 123456789012345678 🧡 구독자`'
+                           '  └ 예: `!역할메시지 123456789012345678 🧡 구독자`\n' +
+                           '  └ 예: `!역할메시지 #공지사항 ✅ @관리자`'
                 },
                 {
                     name: '📝 입장 로그/멘트 명령어',
                     value: '`!입장멘트 <활성화/비활성화>`\n' +
-                           '  └ 새 멤버 입장 시 입장 멘트를 보낼지 설정합니다.\n' +
-                           '`!입장멘트수정 <새로운 멘트>`\n' +
-                           '  └ 새 멤버 입장 시 보낼 멘트를 설정합니다. `{user}`와 `{tag}` 변수 사용 가능.\n' +
+                           '  └ 새 멤버 입장 시 입장 멘트를 보낼지 설정합니다. (로그 기능 전체 활성화/비활성화)\n' +
+                           '`!입장멘트수정 <새로운 멘트 또는 "몇번째">`\n' +
+                           '  └ 새 멤버 입장 시 보낼 멘트를 설정합니다.\n' +
+                           '  └ `"{user}"`는 멤버 멘션, `"{tag}"`는 멤버 태그로 대체됩니다.\n' +
+                           '  └ `"몇번째"`를 입력하면 `N번째 멤버가 입장했어요` 형태로 표시됩니다.\n' +
                            '`!초대자기능 <활성화/비활성화>`\n' +
                            '  └ 새 멤버 입장 시 초대자 정보를 표시할지 설정합니다.\n' +
                            '  └ 봇에게 `초대 보기` 권한이 필요합니다.\n' +
