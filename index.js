@@ -311,7 +311,12 @@ client.on('messageCreate', async message => {
         return message.reply('이 명령어는 서버(길드) 채널에서만 사용할 수 있습니다.');
     }
 
+     // ===> !!! guild 변수 정의 추가 !!! <===
+    const guild = message.guild; 
+    // ===> !!! 여기까지 !!! <===
+
     // 메시지가 설정된 접두사로 시작하는지 확인합니다.
+    const prefix = settings[guild.id]?.prefix || '!'; 
     if (!message.content.startsWith(PREFIX)) return;
 
     const guildId = message.guild.id;
@@ -320,10 +325,12 @@ client.on('messageCreate', async message => {
     const args = message.content.slice(PREFIX.length).trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
     const command = args.shift().toLowerCase();
 
-    // 관리자 권한 확인 함수 (여기에 정의되어 있어야 합니다)
+    // ===> !!! hasAdminPermission 함수 정의 위치 변경 !!! <===
+    // 모든 명령어 블록이 이 함수를 사용하기 전에 정의되어야 합니다.
     const hasAdminPermission = (member) => {
         return member.permissions.has(PermissionsBitField.Flags.Administrator);
     };
+    // ===> !!! 여기까지 !!! <===
 
     // !역할메시지 명령어
     if (command === '역할메시지') {
