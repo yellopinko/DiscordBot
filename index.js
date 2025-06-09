@@ -12,20 +12,17 @@ const path = require('path');
 const { Client, IntentsBitField, Partials, EmbedBuilder } = require('discord.js');
 
 // Discord 클라이언트(봇)를 생성하고 봇이 어떤 이벤트(정보)를 받을지 '인텐트'를 설정합니다.
-// 반응 역할 봇을 위해 필요한 인텐트들입니다.
 const client = new Client({
     intents: [
-        IntentsBitField.Flags.Guilds, // 서버(길드) 관련 정보 (서버 목록, 채널, 역할 등)
-        IntentsBitField.Flags.GuildMessages, // 서버 내 메시지 이벤트 (메시지 생성, 업데이트, 삭제 등)
-        IntentsBitField.Flags.GuildMessageReactions, // 서버 내 메시지 반응 이벤트 (반응 추가, 제거)
-        IntentsBitField.Flags.MessageContent, // 봇이 메시지 내용을 읽을 수 있도록 허용 (명령어 처리 시 필수)
-        // 특권 인텐트: Discord 개발자 포털에서 활성화되었는지 확인하세요.
-        IntentsBitField.Flags.GuildMembers, // 길드 멤버 정보 (member.roles.add 등에 필요)
-        IntentsBitField.Flags.GuildPresences, // 유저 상태 (선택 사항, 필요 시 활성화)
+        IntentsBitField.Flags.Guilds,
+        IntentsBitField.Flags.GuildMessages,
+        IntentsBitField.Flags.GuildMessageReactions,
+        IntentsBitField.Flags.MessageContent,
+        IntentsBitField.Flags.GuildMembers,
+        IntentsBitField.Flags.GuildPresences,
         IntentsBitField.Flags.GuildInvites, // 초대 정보 (입장 로그에 초대자 표시 시 필요)
     ],
-    // 부분적인 이벤트 처리: 봇이 시작되기 전의 메시지에 대한 반응도 처리할 수 있게 합니다.
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember], // GuildMember 추가
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember],
 });
 
 // .env 파일에서 봇 토큰을 가져옵니다.
@@ -38,10 +35,10 @@ const REACTION_ROLES_FILE = path.join(__dirname, 'reactionRoles.json');
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const INVITE_TRACKER_FILE = path.join(__dirname, 'inviteTracker.json');
 
-// 전역 변수 (봇이 재시작되어도 유지되어야 하는 데이터)
-let reactionRoles = {}; // { "guildId": { "messageId": [{ emoji: "...", roleId: "..." }] } }
-let settings = {};      // { "guildId": { "welcomeMessageEnabled": false, "welcomeMessageContent": "...", "inviteTrackingEnabled": false, "logChannelId": "...", "memberCountInTitle": true } }
-let inviteTracker = {}; // { "guildId": { "inviteCode": { "uses": 0, "inviterId": "..." } } }
+// 전역 변수
+let reactionRoles = {};
+let settings = {};
+let inviteTracker = {};
 
 
 // 파일에서 반응 역할 정보를 로드하는 함수
@@ -53,7 +50,7 @@ function loadReactionRoles() {
             console.log('[파일 로드] reactionRoles.json 로드 성공.');
         } catch (error) {
             console.error('[오류] reactionRoles 정보 로드 중 오류:', error);
-            reactionRoles = {}; // 오류 발생 시 빈 객체로 초기화
+            reactionRoles = {};
         }
     } else {
         reactionRoles = {};
@@ -80,7 +77,7 @@ function loadSettings() {
             console.log('[파일 로드] settings.json 로드 성공.');
         } catch (error) {
             console.error('[오류] settings 정보 로드 중 오류:', error);
-            settings = {}; // 오류 발생 시 빈 객체로 초기화
+            settings = {};
         }
     } else {
         settings = {};
@@ -107,7 +104,7 @@ function loadInviteTracker() {
             console.log('[파일 로드] inviteTracker.json 로드 성공.');
         } catch (error) {
             console.error('[오류] inviteTracker 정보 로드 중 오류:', error);
-            inviteTracker = {}; // 오류 발생 시 빈 객체로 초기화
+            inviteTracker = {};
         }
     } else {
         inviteTracker = {};
@@ -159,7 +156,7 @@ client.on('ready', async () => {
 
 // 새로운 초대 생성 시 초대 추적 정보 업데이트
 client.on('inviteCreate', invite => {
-    if (!invite.guild) return; // DM 채널 초대는 무시
+    if (!invite.guild) return;
 
     if (!inviteTracker[invite.guild.id]) {
         inviteTracker[invite.guild.id] = {};
@@ -186,16 +183,16 @@ client.on('inviteDelete', invite => {
 // 멤버가 서버에 입장했을 때 실행되는 이벤트
 client.on('guildMemberAdd', async member => {
     const guild = member.guild;
-    const guildSettings = settings[guild.id];
+    const guildSettings = settings[guild.id] || {}; // 설정이 없을 경우 빈 객체로 초기화
 
-    // guildSettings가 존재하지 않거나, 환영 메시지 활성화가 아니거나, 로그 채널이 설정되지 않았으면 리턴
-    if (!guildSettings || !guildSettings.welcomeMessageEnabled || !guildSettings.logChannelId) {
+    // 환영 메시지 기능이 비활성화되어 있거나 로그 채널이 설정되지 않았으면 리턴
+    if (!guildSettings.welcomeMessageEnabled || !guildSettings.logChannelId) {
         console.log(`[입장 로그] ${guild.name} 서버의 입장 로그 설정이 없거나 비활성화되어 있습니다.`);
         return;
     }
 
     const logChannel = guild.channels.cache.get(guildSettings.logChannelId);
-    if (!logChannel || logChannel.type !== 0) { // 텍스트 채널인지 확인
+    if (!logChannel || logChannel.type !== 0) {
         console.log(`[입장 로그] ${guild.name} 서버의 로그 채널 (${guildSettings.logChannelId})을 찾을 수 없거나 텍스트 채널이 아닙니다.`);
         return;
     }
@@ -218,7 +215,7 @@ client.on('guildMemberAdd', async member => {
             }
 
             // 초대 추적 정보 업데이트
-            inviteTracker[guild.id] = {}; // 기존 초대 정보 초기화
+            inviteTracker[guild.id] = {};
             newInvites.forEach(invite => {
                 inviteTracker[guild.id][invite.code] = {
                     uses: invite.uses,
@@ -228,7 +225,7 @@ client.on('guildMemberAdd', async member => {
             saveInviteTracker();
 
             if (foundInviter) {
-                inviterTag = foundInviter.tag;
+                inviterTag = foundInviter.username || foundInviter.tag; // .username이 더 최신
                 inviterMention = `<@${foundInviter.id}>`;
             } else {
                 inviterTag = '초대자를 찾을 수 없음';
@@ -243,39 +240,42 @@ client.on('guildMemberAdd', async member => {
     }
 
     const welcomeEmbed = new EmbedBuilder()
-        .setColor(0x00FF00) // 기본 색상 유지 (아래 푸터에서 변경)
-        // '몇 번째 멤버' 기능
-        .setTitle(guildSettings.memberCountInTitle ? `${guild.memberCount}번째 멤버가 입장했어요` : (guildSettings.welcomeMessageContent || '새로운 멤버가 입장했어요!'))
-        // '유저' 칸 볼드 처리 및 맨 위로 올리기
-        .setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)`)
+        .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        // 서버에 입장한 시간과 계정 생성일 다시 추가
-        .addFields(
-            { name: '서버에 입장한 시간', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: true },
-            { name: '계정 생성일', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>`, inline: true }
-        )
-        .setTimestamp() // 타임스탬프는 유지하되, 필드로는 표시 안함
-        // 푸터 색상 연보라색 (bf8eef)으로 변경
+        .setTimestamp()
         .setFooter({ text: '환영합니다!', iconURL: guild.iconURL() || client.user.displayAvatarURL() });
+
+    // 1. '몇 번째 멤버' 기능 활성화 여부에 따른 타이틀 및 설명 설정
+    if (guildSettings.memberCountInTitle) {
+        welcomeEmbed.setTitle(`${guild.memberCount}번째 멤버가 입장했어요`);
+        // 몇 번째 멤버일 경우, 기본 유저 정보를 설명에 추가
+        welcomeEmbed.setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)`);
+    } else if (guildSettings.welcomeMessageContent) {
+        // 커스텀 입장 멘트가 있을 경우 (몇 번째 멤버 기능 비활성화 시)
+        const customWelcomeText = guildSettings.welcomeMessageContent
+            .replace(/{user}/g, `<@${member.user.id}>`)
+            .replace(/{tag}/g, member.user.tag);
+        
+        // 커스텀 멘트일 때 유저 부분도 표시
+        welcomeEmbed.setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)\n\n${customWelcomeText}`);
+    } else {
+        // 기본 멘트 (초기 상태 또는 오류 시)
+        welcomeEmbed.setTitle('새로운 멤버가 입장했어요!');
+        welcomeEmbed.setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)`);
+    }
+
+    // 서버에 입장한 시간과 계정 생성일 추가
+    welcomeEmbed.addFields(
+        { name: '서버에 입장한 시간', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: true },
+        { name: '계정 생성일', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>`, inline: true }
+    );
 
     // 초대자 기능 활성화 시에만 초대자 섹션 추가
     if (guildSettings.inviteTrackingEnabled) {
         welcomeEmbed.addFields(
-            { name: '초대자', value: `${inviterTag} (${inviterMention})`, inline: false }
+            { name: '초대자', value: `${inviterMention} (${inviterTag})`, inline: false } // @유저 (유저) 형식
         );
     }
-    
-    // 입장 멘트 수정 기능이 활성화되고, 내용이 있을 경우 Description을 덮어씁니다.
-    if (guildSettings.welcomeMessageContent && !guildSettings.memberCountInTitle) {
-        const customWelcomeText = guildSettings.welcomeMessageContent
-            .replace(/{user}/g, `<@${member.user.id}>`)
-            .replace(/{tag}/g, member.user.tag);
-        welcomeEmbed.setDescription(customWelcomeText);
-    }
-
-
-    // 푸터 색상을 연보라색 (bf8eef)으로 변경
-    welcomeEmbed.setColor(0xBF8EEF); // 16진수 값으로 설정
 
     try {
         await logChannel.send({ embeds: [welcomeEmbed] });
@@ -305,19 +305,17 @@ client.on('messageCreate', async message => {
     const args = message.content.slice(PREFIX.length).trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
     const command = args.shift().toLowerCase();
 
-    // !역할메시지 명령어 (새로운 메시지 생성 목적)
+    // !역할메시지 명령어
     if (command === '역할메시지') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
-        // 인자 파싱: 채널ID, 이모지, 역할ID 또는 역할이름 또는 역할멘션
-        const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, '')); // 큰따옴표 제거
+        const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, ''));
         const channelId = parsedArgs[0];
         const emojiInput = parsedArgs[1];
-        const roleIdentifier = parsedArgs[2]; // 역할 ID, 역할 이름, 또는 역할 멘션 (<@&ID>)
+        const roleIdentifier = parsedArgs[2];
 
-        // 인수 개수 확인 (채널ID, 이모지, 역할ID/이름/멘션)
         if (parsedArgs.length < 3) {
             return message.reply(
                 '❌ 사용법: `!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름 또는 @역할멘션>`\n' +
@@ -329,21 +327,20 @@ client.on('messageCreate', async message => {
 
         try {
             const channel = await client.channels.fetch(channelId).catch(() => null);
-            if (!channel || channel.type !== 0) { // 텍스트 채널 (ChannelType.GuildText은 0)
+            if (!channel || channel.type !== 0) {
                 return message.reply('❌ 유효한 텍스트 채널 ID를 제공해주세요.');
             }
 
-            // 역할 ID, 역할 이름, 또는 역할 멘션으로 역할 찾기
             let role = null;
-            const roleMentionMatch = roleIdentifier.match(/^<@&(\d+)>$/); // 역할 멘션 형식 확인
+            const roleMentionMatch = roleIdentifier.match(/^<@&(\d+)>$/);
 
-            if (roleMentionMatch) { // 역할 멘션인 경우
+            if (roleMentionMatch) {
                 const mentionedRoleId = roleMentionMatch[1];
                 role = message.guild.roles.cache.get(mentionedRoleId);
-            } else { // ID 또는 이름인 경우
-                role = message.guild.roles.cache.get(roleIdentifier); // 먼저 ID로 찾아봄
+            } else {
+                role = message.guild.roles.cache.get(roleIdentifier);
                 if (!role) {
-                    role = message.guild.roles.cache.find(r => r.name === roleIdentifier); // ID로 못 찾으면 이름으로 찾아봄
+                    role = message.guild.roles.cache.find(r => r.name === roleIdentifier);
                 }
             }
             
@@ -351,24 +348,21 @@ client.on('messageCreate', async message => {
                 return message.reply(`❌ 유효한 역할 ID, 역할 이름, 또는 @역할멘션 ('${roleIdentifier}')을 찾을 수 없습니다.`);
             }
 
-            // 봇의 역할이 부여하려는 역할보다 높은지 확인
             if (message.guild.members.me.roles.highest.position <= role.position) {
                 return message.reply(`❌ 봇의 역할이 '${role.name}' 역할보다 낮거나 같아 해당 역할을 부여할 수 없습니다.\n` +
                                      `봇 역할의 순서를 '${role.name}' 역할보다 위로 옮겨주세요.`);
             }
 
             let reactionEmoji;
-            // 커스텀 이모지 처리 (ID로 저장)
             const customEmojiMatch = emojiInput.match(/<a?:(\w+):(\d+)>/);
             if (customEmojiMatch) {
-                reactionEmoji = customEmojiMatch[2]; // 이모지 ID
+                reactionEmoji = customEmojiMatch[2];
             } else {
-                reactionEmoji = emojiInput; // 유니코드 이모지
+                reactionEmoji = emojiInput;
             }
 
-            // 새로운 임베드 메시지 생성 (고정된 내용)
             const roleEmbed = new EmbedBuilder()
-                .setColor(0xFFA7D1) // 핑크색 계열
+                .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영 (기존 FFA7D1에서 변경)
                 .setTitle('💜 꼭 읽어줘! 💜')
                 .setDescription(
                     `❌ 시청자들 간에 과한 친목성 발언, 말다툼\n` +
@@ -376,28 +370,25 @@ client.on('messageCreate', async message => {
                     `❌ 도배, 욕설, 성희롱, 성드립 등 불쾌감을 주는 채팅\n` +
                     `❌ 정치, 종교, 인종 등 사회적이슈 언급\n` +
                     `❌ 광고 및 개인SNS 홍보\n\n` +
-                    `(아래에 있는 이모지(${emojiInput}) 선택시 역할이 지급됩니다.)` // 사용자가 입력한 이모지 그대로 표시
+                    `(아래에 있는 이모지(${emojiInput}) 선택시 역할이 지급됩니다.)`
                 )
                 .setTimestamp()
                 .setFooter({ text: '역할을 받으려면 이모지를 클릭하세요!' });
 
             const sentMessage = await channel.send({ embeds: [roleEmbed] });
-            await sentMessage.react(reactionEmoji); // 실제 반응은 저장된 이모지 ID 또는 유니코드 이모지로
+            await sentMessage.react(reactionEmoji);
 
-            // guildReactionRoles 초기화 (해당 길드의 데이터가 없으면)
             if (!reactionRoles[guildId]) {
                 reactionRoles[guildId] = {};
             }
-            // 해당 메시지 ID에 대한 배열이 없으면 새로 생성
             if (!reactionRoles[guildId][sentMessage.id]) {
                 reactionRoles[guildId][sentMessage.id] = [];
             }
-            // 현재 메시지에 대한 이모지-역할 쌍을 저장
             reactionRoles[guildId][sentMessage.id].push({
-                emoji: reactionEmoji, // 저장되는 이모지 (유니코드 또는 ID)
+                emoji: reactionEmoji,
                 roleId: role.id
             });
-            saveReactionRoles(); // 파일에 저장
+            saveReactionRoles();
 
             message.reply(`✅ 새로운 반응 역할 메시지가 <#${channel.id}> 채널에 성공적으로 생성되었습니다.`);
             console.log(`[명령어] ${message.guild.name} 서버에 새 역할 메시지 생성: 채널 ${channelId}, 메시지 ${sentMessage.id}, 이모지 ${emojiInput}, 역할 ${role.id}`);
@@ -407,7 +398,7 @@ client.on('messageCreate', async message => {
             message.reply('❌ 역할 메시지를 설정하는 중 오류가 발생했습니다. ID와 권한을 확인해주세요.');
         }
     }
-    // !입장멘트 활성화/비활성화 (여기서는 환영 메시지 기능의 전체 활성화/비활성화)
+    // !입장멘트 활성화/비활성화
     else if (command === '입장멘트') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
@@ -433,7 +424,7 @@ client.on('messageCreate', async message => {
             return message.reply('❌ 유효한 옵션이 아닙니다. `활성화` 또는 `비활성화`를 사용해주세요.');
         }
     }
-    // !입장멘트수정 <새 멘트> 명령어 (몇 번째 멤버 끄고, 관리자가 지정한 멘트 표시)
+    // !입장멘트수정 <새 멘트> 명령어
     else if (command === '입장멘트수정') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
@@ -450,7 +441,7 @@ client.on('messageCreate', async message => {
         
         if (newContent.toLowerCase() === '몇번째') {
             settings[guildId].memberCountInTitle = true;
-            settings[guildId].welcomeMessageContent = null; // 커스텀 멘트 비활성화
+            settings[guildId].welcomeMessageContent = null;
             message.reply('✅ 입장 로그 제목이 `N번째 멤버가 입장했어요`로 표시됩니다.');
         } else {
             settings[guildId].memberCountInTitle = false;
@@ -477,7 +468,6 @@ client.on('messageCreate', async message => {
             saveSettings();
             message.reply('✅ 초대자 추적 기능이 활성화되었습니다. 이제부터 멤버 입장 시 초대자 정보가 표시됩니다.');
 
-            // 활성화 시 기존 초대 정보 갱신
             try {
                 const invites = await message.guild.invites.fetch();
                 inviteTracker[guildId] = {};
@@ -509,7 +499,7 @@ client.on('messageCreate', async message => {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
-        const parsedArgs = args.map(arg => arg.replace(/<#|>/g, '')); // 멘션에서 ID 추출
+        const parsedArgs = args.map(arg => arg.replace(/<#|>/g, ''));
         if (parsedArgs.length < 1 || !parsedArgs[0]) {
              return message.reply('❌ 사용법: `!입장로그채널 <채널ID 또는 #채널멘션>`');
         }
@@ -517,7 +507,7 @@ client.on('messageCreate', async message => {
         const channelId = parsedArgs[0];
         const channel = await client.channels.fetch(channelId).catch(() => null);
 
-        if (!channel || channel.type !== 0) { // 텍스트 채널 (ChannelType.GuildText은 0)
+        if (!channel || channel.type !== 0) {
             return message.reply('❌ 유효한 텍스트 채널을 지정해주세요.');
         }
 
@@ -529,7 +519,7 @@ client.on('messageCreate', async message => {
     // !help 명령어
     else if (command === 'help') {
         const helpEmbed = new EmbedBuilder()
-            .setColor(0x0099FF)
+            .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
             .setTitle('봇 명령어 도움말')
             .setDescription('안녕하세요! 저는 갈래의 보금자리 지킴이 입니다')
             .addFields(
@@ -586,7 +576,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
     const { message, emoji } = reaction;
     const guildId = message.guild.id;
 
-    // reactionRoles에서 해당 길드의 메시지 정보를 가져옵니다.
     const guildReactionRoles = reactionRoles[guildId];
 
     if (guildReactionRoles && guildReactionRoles[message.id]) {
@@ -594,10 +583,9 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
         for (const entry of reactionRoleEntries) {
             let isMatch = false;
-            // 유니코드 이모지 또는 커스텀 이모지 (ID) 매칭
-            if (emoji.id) { // 커스텀 이모지인 경우
+            if (emoji.id) {
                 isMatch = entry.emoji === emoji.id;
-            } else { // 유니코드 이모지인 경우
+            } else {
                 isMatch = entry.emoji === emoji.name;
             }
 
@@ -629,14 +617,13 @@ client.on('messageReactionAdd', async (reaction, user) => {
                     console.log(`[반응 추가 감지] ${member.user.tag} 은(는) 이미 '${role.name}' 역할을 가지고 있습니다.`);
                 }
 
-                // 반응 숫자를 0으로 유지
                 try {
-                    const uniqueId = message.id + user.id + emoji.name + (emoji.id || ''); // 커스텀 이모지 ID 추가
+                    const uniqueId = message.id + user.id + emoji.name + (emoji.id || '');
                     client.ignoringReactionRemoves.add(uniqueId);
                     await reaction.users.remove(user.id);
                     setTimeout(() => {
                         client.ignoringReactionRemoves.delete(uniqueId);
-                    }, 1000); // 1초 후 플래그 제거
+                    }, 1000);
                 } catch (error) {
                     console.error(`[오류] ${member.user.tag} 의 반응 제거 중 오류:`, error);
                 }
@@ -675,9 +662,9 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
         for (const entry of reactionRoleEntries) {
             let isMatch = false;
-            if (emoji.id) { // 커스텀 이모지인 경우
+            if (emoji.id) {
                 isMatch = entry.emoji === emoji.id;
-            } else { // 유니코드 이모지인 경우
+            } else {
                 isMatch = entry.emoji === emoji.name;
             }
 
