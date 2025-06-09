@@ -40,7 +40,7 @@ const INVITE_TRACKER_FILE = path.join(__dirname, 'inviteTracker.json');
 
 // 전역 변수 (봇이 재시작되어도 유지되어야 하는 데이터)
 let reactionRoles = {}; // { "guildId": { "messageId": [{ emoji: "...", roleId: "..." }] } }
-let settings = {};      // { "guildId": { "welcomeMessage": "...", "inviteTrackingEnabled": false, "logChannelId": "..." } }
+let settings = {};      // { "guildId": { "welcomeMessageEnabled": false, "welcomeMessageContent": "...", "inviteTrackingEnabled": false, "logChannelId": "..." } }
 let inviteTracker = {}; // { "guildId": { "inviteCode": { "uses": 0, "inviterId": "..." } } }
 
 
@@ -188,81 +188,89 @@ client.on('guildMemberAdd', async member => {
     const guild = member.guild;
     const guildSettings = settings[guild.id];
 
-    if (!guildSettings) {
-        console.log(`[입장 로그] ${guild.name} 서버의 설정이 없습니다.`);
+    // guildSettings가 존재하지 않거나, 환영 메시지 활성화가 아니거나, 로그 채널이 설정되지 않았으면 리턴
+    if (!guildSettings || !guildSettings.welcomeMessageEnabled || !guildSettings.logChannelId) {
+        console.log(`[입장 로그] ${guild.name} 서버의 입장 로그 설정이 없거나 비활성화되어 있습니다.`);
         return;
     }
 
-    // 환영 메시지 활성화 및 채널 설정 여부 확인
-    if (guildSettings.welcomeMessage && guildSettings.logChannelId) {
-        const logChannel = guild.channels.cache.get(guildSettings.logChannelId);
-        if (logChannel && logChannel.type === 0) { // 텍스트 채널인지 확인
-            let inviter = '알 수 없음';
-            let inviteCodeUsed = '알 수 없음';
+    const logChannel = guild.channels.cache.get(guildSettings.logChannelId);
+    if (!logChannel || logChannel.type !== 0) { // 텍스트 채널인지 확인
+        console.log(`[입장 로그] ${guild.name} 서버의 로그 채널 (${guildSettings.logChannelId})을 찾을 수 없거나 텍스트 채널이 아닙니다.`);
+        return;
+    }
 
-            if (guildSettings.inviteTrackingEnabled) {
-                try {
-                    // 입장 전 초대 사용 횟수를 가져옵니다.
-                    const newInvites = await guild.invites.fetch();
-                    const oldInvites = inviteTracker[guild.id] || {};
-                    let foundInviter = null;
+    let inviterTag = '알 수 없음';
+    let inviterMention = '알 수 없음';
+    let inviterThumbnail = null; // 초대자 프로필 이미지
 
-                    for (const [code, newInvite] of newInvites) {
-                        const oldInvite = oldInvites[code];
-                        // 새로운 사용 횟수가 이전보다 많고, 초대 코드가 존재하며, 봇이 아닌 유저가 초대한 경우
-                        if (oldInvite && newInvite.uses > oldInvite.uses) {
-                            foundInviter = newInvite.inviter;
-                            inviteCodeUsed = code;
-                            break;
-                        }
-                    }
+    if (guildSettings.inviteTrackingEnabled) {
+        try {
+            const newInvites = await guild.invites.fetch();
+            const oldInvites = inviteTracker[guild.id] || {};
+            let foundInviter = null;
 
-                    // 초대 추적 정보 업데이트
-                    inviteTracker[guild.id] = {}; // 기존 초대 정보 초기화
-                    newInvites.forEach(invite => {
-                        inviteTracker[guild.id][invite.code] = {
-                            uses: invite.uses,
-                            inviterId: invite.inviter ? invite.inviter.id : null
-                        };
-                    });
-                    saveInviteTracker(); // 업데이트된 초대 정보 저장
-
-                    if (foundInviter) {
-                        inviter = `${foundInviter.tag} (<@${foundInviter.id}>)`;
-                    } else {
-                        inviter = '초대자를 찾을 수 없음';
-                    }
-
-                } catch (error) {
-                    console.error('[오류] 초대 추적 중 오류:', error);
-                    inviter = '초대 정보를 가져올 수 없음 (권한 부족?)';
+            for (const [code, newInvite] of newInvites) {
+                const oldInvite = oldInvites[code];
+                if (oldInvite && newInvite.uses > oldInvite.uses) {
+                    foundInviter = newInvite.inviter;
+                    break;
                 }
             }
 
-            const welcomeEmbed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('새로운 멤버가 입장했어요!')
-                .setDescription(`${member.user.tag} 님이 서버에 오신 것을 환영합니다!`)
-                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-                .addFields(
-                    { name: '사용자', value: `${member.user.tag} (<@${member.user.id}>)`, inline: true },
-                    { name: '서버에 입장한 시간', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: true },
-                    { name: '계정 생성일', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>`, inline: true },
-                    { name: '초대자', value: inviter, inline: true },
-                    { name: '사용된 초대 코드', value: inviteCodeUsed, inline: true }
-                )
-                .setTimestamp()
-                .setFooter({ text: `현재 멤버 수: ${guild.memberCount}` });
+            // 초대 추적 정보 업데이트
+            inviteTracker[guild.id] = {}; // 기존 초대 정보 초기화
+            newInvites.forEach(invite => {
+                inviteTracker[guild.id][invite.code] = {
+                    uses: invite.uses,
+                    inviterId: invite.inviter ? invite.inviter.id : null
+                };
+            });
+            saveInviteTracker();
 
-            try {
-                await logChannel.send({ embeds: [welcomeEmbed] });
-                console.log(`[입장 로그] ${member.user.tag} 님의 입장 메시지를 ${logChannel.name} 에 전송했습니다.`);
-            } catch (error) {
-                console.error(`[오류] 입장 메시지 전송 실패 (채널: ${logChannel.name}):`, error);
+            if (foundInviter) {
+                inviterTag = foundInviter.tag;
+                inviterMention = `<@${foundInviter.id}>`;
+                inviterThumbnail = foundInviter.displayAvatarURL({ dynamic: true });
+            } else {
+                inviterTag = '초대자를 찾을 수 없음';
+                inviterMention = '초대자를 찾을 수 없음';
             }
+
+        } catch (error) {
+            console.error('[오류] 초대 추적 중 오류:', error);
+            inviterTag = '초대 정보를 가져올 수 없음';
+            inviterMention = '초대 정보를 가져올 수 없음';
         }
     }
+
+    // 환영 메시지 내용 (사용자 지정 멘트 또는 기본 멘트)
+    const welcomeContent = guildSettings.welcomeMessageContent || `환영합니다!`; // 기본 멘트
+    const finalWelcomeMessage = welcomeContent.replace(/{user}/g, `<@${member.user.id}>`).replace(/{tag}/g, member.user.tag);
+
+
+    const welcomeEmbed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        // 이미지와 같은 제목 형식 (53번째 멤버가 입장했어요)
+        .setTitle(`${guild.memberCount}번째 멤버가 입장했어요`)
+        // 이미지와 같은 유저 정보와 멘션
+        .setDescription(`유저 ${member.user.tag} (<@${member.user.id}>)`)
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        // 초대자 정보를 필드로 추가 (이미지처럼)
+        .addFields(
+            { name: '초대자', value: `${inviterTag} (${inviterMention})`, inline: false }
+        )
+        .setTimestamp() // 타임스탬프는 유지하되, 필드로는 표시 안함
+        .setFooter({ text: `환영합니다!`, iconURL: guild.iconURL() || client.user.displayAvatarURL() }); // 푸터는 간략하게
+
+    try {
+        await logChannel.send({ embeds: [welcomeEmbed] });
+        console.log(`[입장 로그] ${member.user.tag} 님의 입장 메시지를 ${logChannel.name} 에 전송했습니다.`);
+    } catch (error) {
+        console.error(`[오류] 입장 메시지 전송 실패 (채널: ${logChannel.name}):`, error);
+    }
 });
+
 
 // 새로운 메시지가 생성되었을 때 실행되는 이벤트
 client.on('messageCreate', async message => {
@@ -279,6 +287,7 @@ client.on('messageCreate', async message => {
 
     const guildId = message.guild.id;
 
+    // 명령어와 인수를 분리 (큰따옴표 안의 공백도 하나의 인수로 처리)
     const args = message.content.slice(PREFIX.length).trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
     const command = args.shift().toLowerCase();
 
@@ -288,29 +297,35 @@ client.on('messageCreate', async message => {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
-        // 인자 파싱: 채널ID, 이모지, 역할ID
-        const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, ''));
+        // 인자 파싱: 채널ID, 이모지, 역할ID 또는 역할이름
+        const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, '')); // 큰따옴표 제거
         const channelId = parsedArgs[0];
         const emojiInput = parsedArgs[1];
-        const roleId = parsedArgs[2];
+        const roleIdentifier = parsedArgs[2]; // 역할 ID 또는 역할 이름
 
-        // 인수 개수 확인 (채널ID, 이모지, 역할ID)
+        // 인수 개수 확인 (채널ID, 이모지, 역할ID/이름)
         if (parsedArgs.length < 3) {
             return message.reply(
-                '❌ 사용법: `!역할메시지 <채널ID> <이모지> <역할ID>`\n' +
-                '예시: `!역할메시지 #규칙 👍 123456789012345678`'
+                '❌ 사용법: `!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름>`\n' +
+                '예시: `!역할메시지 #규칙 👍 123456789012345678`\n' +
+                '예시: `!역할메시지 123456789012345678 🧡 구독자`'
             );
         }
 
         try {
-            const channel = await client.channels.fetch(channelId);
+            const channel = await client.channels.fetch(channelId).catch(() => null);
             if (!channel || channel.type !== 0) { // 텍스트 채널 (ChannelType.GuildText은 0)
                 return message.reply('❌ 유효한 텍스트 채널 ID를 제공해주세요.');
             }
 
-            const role = message.guild.roles.cache.get(roleId);
+            // 역할 ID 또는 역할 이름으로 역할 찾기
+            let role = message.guild.roles.cache.get(roleIdentifier); // 먼저 ID로 찾아봄
             if (!role) {
-                return message.reply('❌ 유효한 역할 ID를 제공해주세요.');
+                role = message.guild.roles.cache.find(r => r.name === roleIdentifier); // ID로 못 찾으면 이름으로 찾아봄
+            }
+
+            if (!role) {
+                return message.reply(`❌ 유효한 역할 ID 또는 역할 이름 ('${roleIdentifier}')을 찾을 수 없습니다.`);
             }
 
             // 봇의 역할이 부여하려는 역할보다 높은지 확인
@@ -362,7 +377,7 @@ client.on('messageCreate', async message => {
             saveReactionRoles(); // 파일에 저장
 
             message.reply(`✅ 새로운 반응 역할 메시지가 <#${channel.id}> 채널에 성공적으로 생성되었습니다.`);
-            console.log(`[명령어] ${message.guild.name} 서버에 새 역할 메시지 생성: 채널 ${channelId}, 메시지 ${sentMessage.id}, 이모지 ${emojiInput}, 역할 ${roleId}`);
+            console.log(`[명령어] ${message.guild.name} 서버에 새 역할 메시지 생성: 채널 ${channelId}, 메시지 ${sentMessage.id}, 이모지 ${emojiInput}, 역할 ${role.id}`);
 
         } catch (error) {
             console.error('[오류] 역할 메시지 설정 중 오류:', error);
@@ -383,17 +398,33 @@ client.on('messageCreate', async message => {
         const action = parsedArgs[0].toLowerCase();
         if (action === '활성화' || action === 'on') {
             if (!settings[guildId]) settings[guildId] = {};
-            settings[guildId].welcomeMessage = true;
+            settings[guildId].welcomeMessageEnabled = true;
             saveSettings();
             message.reply('✅ 입장 멘트가 활성화되었습니다. 이제부터 새 멤버가 입장하면 로그 채널에 메시지를 보냅니다.');
         } else if (action === '비활성화' || action === 'off') {
             if (!settings[guildId]) settings[guildId] = {};
-            settings[guildId].welcomeMessage = false;
+            settings[guildId].welcomeMessageEnabled = false;
             saveSettings();
             message.reply('✅ 입장 멘트가 비활성화되었습니다.');
         } else {
             return message.reply('❌ 유효한 옵션이 아닙니다. `활성화` 또는 `비활성화`를 사용해주세요.');
         }
+    }
+    // !입장멘트수정 <새 멘트> 명령어 복구
+    else if (command === '입장멘트수정') {
+        if (!message.member.permissions.has('Administrator')) {
+            return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
+        }
+
+        const newContent = args.join(' ').trim();
+        if (newContent.length === 0) {
+            return message.reply('❌ 사용법: `!입장멘트수정 <새로운 입장 멘트>`\n`{user}`는 멤버 멘션, `{tag}`는 멤버 태그로 대체됩니다.');
+        }
+
+        if (!settings[guildId]) settings[guildId] = {};
+        settings[guildId].welcomeMessageContent = newContent;
+        saveSettings();
+        message.reply(`✅ 입장 멘트가 다음과 같이 수정되었습니다:\n\`\`\`${newContent}\`\`\`\n(예: ${newContent.replace(/{user}/g, message.author.toString()).replace(/{tag}/g, message.author.tag)})`);
     }
     // !초대자기능 활성화/비활성화
     else if (command === '초대자기능') {
@@ -466,21 +497,22 @@ client.on('messageCreate', async message => {
     else if (command === 'help') {
         const helpEmbed = new EmbedBuilder()
             .setColor(0x0099FF)
-            // ★★★ 이 부분을 원래대로 복구 ★★★
             .setTitle('봇 사용법')
             .setDescription('안녕하세요! 저는 서버 관리에 도움을 드리는 봇입니다.')
             .addFields(
                 {
                     name: '💜 반응 역할 명령어',
-                    // ★★★ 이 부분의 따옴표 제거 ★★★
-                    value: '`!역할메시지 <채널ID> <이모지> <역할ID>`\n' +
+                    value: '`!역할메시지 <채널ID> <이모지> <역할ID 또는 역할이름>`\n' +
                            '  └ 새로운 임베드 메시지를 생성하고, 지정된 이모지에 반응하면 역할을 부여합니다.\n' +
-                           '  └ 예: `!역할메시지 #규칙 👍 123456789012345678`'
+                           '  └ 예: `!역할메시지 #규칙 👍 123456789012345678`\n' +
+                           '  └ 예: `!역할메시지 123456789012345678 🧡 구독자`'
                 },
                 {
                     name: '📝 입장 로그/멘트 명령어',
                     value: '`!입장멘트 <활성화/비활성화>`\n' +
                            '  └ 새 멤버 입장 시 입장 멘트를 보낼지 설정합니다.\n' +
+                           '`!입장멘트수정 <새로운 멘트>`\n' +
+                           '  └ 새 멤버 입장 시 보낼 멘트를 설정합니다. `{user}`와 `{tag}` 변수 사용 가능.\n' +
                            '`!초대자기능 <활성화/비활성화>`\n' +
                            '  └ 새 멤버 입장 시 초대자 정보를 표시할지 설정합니다.\n' +
                            '  └ 봇에게 `초대 보기` 권한이 필요합니다.\n' +
@@ -572,8 +604,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
                 } catch (error) {
                     console.error(`[오류] ${member.user.tag} 의 반응 제거 중 오류:`, error);
                 }
-                // 하나의 메시지에 여러 이모지-역할 쌍이 있을 수 있으므로, 매칭되는 하나만 처리하고 다음 이모지를 위해 계속 반복
-                // break; // 하나의 매칭만 처리하려면 이 주석을 해제 (현재는 모든 매칭 처리)
             }
         }
     }
@@ -642,7 +672,6 @@ client.on('messageReactionRemove', async (reaction, user) => {
                 } else {
                      console.log(`[반응 제거 감지] ${member.user.tag} 은(는) 이미 '${role.name}' 역할을 가지고 있지 않습니다.`);
                 }
-                // break; // 하나의 매칭만 처리하려면 이 주석을 해제 (현재는 모든 매칭 처리)
             }
         }
     }
