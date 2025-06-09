@@ -411,6 +411,52 @@ client.on('messageCreate', async message => {
             message.reply('❌ 역할 메시지를 설정하는 중 오류가 발생했습니다. ID와 권한을 확인해주세요.');
         }
     }
+
+    // --- 여기에 !설정상태 명령어 코드 추가 ---
+    // 아래 코드를 이전 답변에서 제공해 드린 !설정상태 명령어 코드로 완전히 대체하세요.
+    // 즉, 아래 if (command === '설정상태') { ... } 블록 전체를 복사해서 붙여넣으세요.
+    if (command === '설정상태') {
+        if (!hasAdminPermission(message.member)) {
+            return message.reply('**이 명령어를 사용하려면 관리자 권한이 필요합니다.**');
+        }
+
+        const guildSettings = settings[guild.id] || {};
+
+        const welcomeMessageEnabledStatus = guildSettings.welcomeMessageEnabled ? '**활성화됨**' : '**비활성화됨**';
+        const logChannelIdStatus = guildSettings.logChannelId ? `<#${guildSettings.logChannelId}> (**설정됨**)` : '**설정되지 않음**';
+        const inviteTrackingEnabledStatus = guildSettings.inviteTrackingEnabled ? '**활성화됨**' : '**비활성화됨**';
+        
+        let welcomeMessageContentStatus;
+        if (guildSettings.welcomeMessageContent && guildSettings.welcomeMessageContent !== '새로운 멤버가 입장했어요!') {
+            welcomeMessageContentStatus = `**수정됨** (\`${guildSettings.welcomeMessageContent}\`)`;
+        } else {
+            welcomeMessageContentStatus = '**기본값**';
+        }
+
+        const memberCountInTitleStatus = guildSettings.memberCountInTitle ? '**활성화됨**' : '**비활성화됨**';
+
+        const statusEmbed = new EmbedBuilder()
+            .setColor(0xBF8EEF)
+            .setTitle(`**${message.guild.name} 서버의 봇 설정 상태**`) // guild.name 대신 message.guild.name 사용
+            .addFields(
+                { name: '**입장 로그 활성화**', value: welcomeMessageEnabledStatus, inline: true },
+                { name: '**로그 채널**', value: logChannelIdStatus, inline: true },
+                { name: '\u200B', value: '\u200B', inline: false },
+                { name: '**초대자 기능 활성화**', value: inviteTrackingEnabledStatus, inline: true },
+                { name: '**입장 멘트**', value: welcomeMessageContentStatus, inline: true },
+                { name: '\u200B', value: '\u200B', inline: false },
+                { name: '**\'몇 번째 멤버\' 기능**', value: memberCountInTitleStatus, inline: false }
+            )
+            .setTimestamp()
+            .setFooter({ text: '**봇 설정 상태**', iconURL: client.user.displayAvatarURL() });
+
+        await message.channel.send({ embeds: [statusEmbed] });
+        console.log(`[설정 상태] ${message.author.tag} 님이 ${message.guild.name} 서버의 설정 상태를 확인했습니다.`); // guild.name 대신 message.guild.name 사용
+    }
+
+    // 이 아래에 다른 기존 명령어 처리 if 문들이 있을 수 있습니다.
+    // ...
+
     // !입장로그 활성화/비활성화
     else if (command === '입장로그') {
         if (!message.member.permissions.has('Administrator')) {
