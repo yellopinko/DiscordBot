@@ -242,8 +242,6 @@ client.on('guildMemberAdd', async member => {
     const welcomeEmbed = new EmbedBuilder()
         .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        .setTimestamp() // 메시지 전송 시간 표시
-        .setFooter({ text: '**환영합니다!**', iconURL: guild.iconURL() || client.user.displayAvatarURL() });
 
     // '유저' 정보는 항상 필드로 추가 (가장 위로 이동)
     welcomeEmbed.addFields(
