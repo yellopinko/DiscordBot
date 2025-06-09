@@ -452,7 +452,7 @@ client.on('messageCreate', async message => {
             .setTitle(`**${message.guild.name} 서버의 봇 설정 상태**`) // guild.name 대신 message.guild.name 사용
             .addFields(
                 { name: '**입장 로그 활성화**', value: welcomeMessageEnabledStatus, inline: true },
-                { name: '**로그 채널**', value: logChannelIdStatus, inline: true },
+                { name: '**로그 채널**', value: logChannelIdStatus, inline: false },
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: '**초대자 기능 활성화**', value: inviteTrackingEnabledStatus, inline: false },
                 { name: '**입장 멘트**', value: welcomeMessageContentStatus, inline: false },
