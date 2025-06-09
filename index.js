@@ -308,11 +308,87 @@ client.on('messageCreate', async message => {
     const guildReactionRoles = getGuildReactionRoles(guildId); // 현재 서버의 반응 역할 정보 가져오기
 
     // 메시지 내용을 접두사를 제외하고 공백으로 분리하여 명령어와 인수를 추출합니다.
-    const args = message.content.slice(PREFIX.length).trim().split(/\s+/);
+    // 인수가 큰따옴표로 묶여있을 수 있으므로 정규식을 사용하여 올바르게 분리합니다.
+    const args = message.content.slice(PREFIX.length).trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
     const command = args.shift().toLowerCase(); // 첫 번째 단어를 명령어로 사용
 
-    // '역할메시지' 명령어
-    if (command === '역할메시지') {
+    // '새역할메시지' 명령어 (새 메시지 생성)
+    if (command === '새역할메시지') {
+        // 관리자 권한 확인
+        if (!message.member.permissions.has('Administrator')) {
+            return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
+        }
+
+        // 인자 파싱: 채널ID, 메시지 제목, 메시지 내용, 이모지, 역할ID
+        // 큰따옴표로 묶인 인자 처리
+        const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, '')); // 큰따옴표 제거
+        const channelId = parsedArgs[0];
+        const title = parsedArgs[1];
+        const description = parsedArgs[2];
+        const emojiInput = parsedArgs[3]; // 사용자가 입력한 이모지 문자열
+        const roleId = parsedArgs[4];
+
+        if (!channelId || !title || !description || !emojiInput || !roleId) {
+            return message.reply(
+                '사용법: `!새역할메시지 <채널ID> "<메시지제목>" "<메시지내용>" <이모지> <역할ID>`\n' +
+                '예시: `!새역할메시지 #채널ID "규칙에 동의하세요!" "아래 이모지를 눌러 역할을 받으세요." 👍 123456789012345678`'
+            );
+        }
+
+        try {
+            const channel = await client.channels.fetch(channelId);
+            if (!channel || channel.type !== 0) { // 0은 TextChannel
+                return message.reply('유효한 채널 ID를 제공해주세요.');
+            }
+
+            const role = message.guild.roles.cache.get(roleId);
+            if (!role) {
+                return message.reply('유효한 역할 ID를 제공해주세요.');
+            }
+
+            // 이모지 유니코드 또는 Discord 커스텀 이모지 ID로 변환
+            let reactionEmoji;
+            const customEmojiMatch = emojiInput.match(/<a?:(\w+):(\d+)>/); // <a:name:id> 또는 <:name:id>
+            if (customEmojiMatch) {
+                reactionEmoji = customEmojiMatch[2]; // 커스텀 이모지 ID
+            } else {
+                reactionEmoji = emojiInput; // 유니코드 이모지
+            }
+
+            // 새로운 임베드 메시지 생성
+            const roleEmbed = new EmbedBuilder()
+                .setColor(0x0099FF)
+                .setTitle(title)
+                .setDescription(description)
+                .setTimestamp()
+                .setFooter({ text: '역할을 받으려면 이모지를 클릭하세요!' });
+
+            const sentMessage = await channel.send({ embeds: [roleEmbed] });
+            await sentMessage.react(reactionEmoji);
+            
+            // 해당 메시지 ID에 대한 배열이 없으면 새로 생성
+            if (!guildReactionRoles[sentMessage.id]) {
+                guildReactionRoles[sentMessage.id] = [];
+            }
+            // 현재 서버의 reactionRoles에 새로운 정보 추가
+            guildReactionRoles[sentMessage.id].push({
+                emoji: reactionEmoji, 
+                roleId: roleId
+            });
+
+            // 정보가 변경되었으므로 파일에 저장
+            saveReactionRoles(); 
+
+            message.reply(`새로운 반응 역할 메시지가 <#${channel.id}> 채널에 성공적으로 생성되었습니다.`);
+            console.log(`[명령어] ${message.guild.name} 서버에 새 역할 메시지 생성: 채널 ${channelId}, 메시지 ${sentMessage.id}, 이모지 ${emojiInput}, 역할 ${roleId}`);
+
+        } catch (error) {
+            console.error('[오류] 새 역할 메시지 설정 중 오류:', error);
+            message.reply('새 역할 메시지를 설정하는 중 오류가 발생했습니다. ID와 권한을 확인해주세요.');
+        }
+    }
+    // '역할메시지' 명령어 (기존 메시지에 추가) - 기존 기능 유지
+    else if (command === '역할메시지') {
         // 관리자 권한 확인
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
@@ -336,6 +412,11 @@ client.on('messageCreate', async message => {
             const targetMessage = await channel.messages.fetch(messageId);
             if (!targetMessage) {
                 return message.reply('유효한 메시지 ID를 제공해주세요.');
+            }
+
+            const role = message.guild.roles.cache.get(roleId);
+            if (!role) {
+                return message.reply('유효한 역할 ID를 제공해주세요.');
             }
 
             // 이모지 유니코드 또는 Discord 커스텀 이모지 ID로 변환
@@ -367,7 +448,7 @@ client.on('messageCreate', async message => {
             // 정보가 변경되었으므로 파일에 저장
             saveReactionRoles(); 
 
-            message.reply('반응 역할 메시지가 성공적으로 설정되었습니다.');
+            message.reply('기존 메시지에 반응 역할이 성공적으로 추가되었습니다.');
             console.log(`[명령어] ${message.guild.name} 서버에 역할 메시지 설정: 채널 ${channelId}, 메시지 ${messageId}, 이모지 ${emojiInput}, 역할 ${roleId}`);
 
         } catch (error) {
@@ -465,8 +546,13 @@ client.on('messageCreate', async message => {
                     inline: false 
                 },
                 { 
+                    name: `${PREFIX}새역할메시지 <채널ID> "<메시지제목>" "<메시지내용>" <이모지> <역할ID>`, 
+                    value: '새로운 메시지를 생성하고 거기에 반응 역할을 설정합니다. (관리자 전용)', 
+                    inline: false 
+                },
+                { 
                     name: `${PREFIX}역할메시지 <채널ID> <메시지ID> <이모지> <역할ID>`, 
-                    value: '특정 메시지에 반응 역할을 설정합니다. 한 메시지에 여러 이모지-역할 쌍 설정 가능. (관리자 전용)', 
+                    value: '기존 메시지에 새로운 이모지-역할 쌍을 추가합니다. (관리자 전용)', 
                     inline: false 
                 },
                 { 
