@@ -586,7 +586,7 @@ client.on('messageCreate', async message => {
         message.reply(`✅ 입장로그 채널이 <#${channel.id}> (으)로 설정되었습니다.`);
     }
     // !help 명령어
-     else if (command === 'help') { // else if 로 시작하는 부분
+     else if (command === 'help' || command === '도움말') { // else if 로 시작하는 부분
         const helpEmbed = new EmbedBuilder()
             .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
             .setTitle('**봇 명령어 도움말**') // 볼드체 추가
@@ -622,7 +622,7 @@ client.on('messageCreate', async message => {
                 },
                 {
                     name: '**ℹ️ 기타**', // 볼드체 추가
-                    value: '`!help`\n  └ **이 도움말을 표시합니다.**' // 볼드체 추가
+                    value: '`!help` **또는** '!도움말'\n  └ **이 도움말을 표시합니다.**' // 볼드체 추가
                 }
             );
 
