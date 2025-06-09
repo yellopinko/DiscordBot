@@ -242,29 +242,35 @@ client.on('guildMemberAdd', async member => {
     const welcomeEmbed = new EmbedBuilder()
         .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        .setTimestamp()
-        .setFooter({ text: '환영합니다!', iconURL: guild.iconURL() || client.user.displayAvatarURL() });
+
+    // '유저' 정보는 항상 필드로 추가 (가장 위로 이동)
+    welcomeEmbed.addFields(
+        { name: '유저', value: `<@${member.user.id}> (${member.user.tag})`, inline: false } // @유저 (유저) 형식
+    );
 
     // 1. '몇 번째 멤버' 기능 활성화 여부에 따른 타이틀 및 설명 설정
     if (guildSettings.memberCountInTitle) {
         welcomeEmbed.setTitle(`${guild.memberCount}번째 멤버가 입장했어요`);
-        // 몇 번째 멤버일 경우, 기본 유저 정보를 설명에 추가
-        welcomeEmbed.setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)`);
+        // 몇 번째 멤버일 경우, description은 비워둡니다 (유저 정보는 이미 필드로 들어갔음).
+        welcomeEmbed.setDescription(null); 
     } else if (guildSettings.welcomeMessageContent) {
         // 커스텀 입장 멘트가 있을 경우 (몇 번째 멤버 기능 비활성화 시)
         const customWelcomeText = guildSettings.welcomeMessageContent
             .replace(/{user}/g, `<@${member.user.id}>`)
             .replace(/{tag}/g, member.user.tag);
         
-        // 커스텀 멘트일 때 유저 부분도 표시
-        welcomeEmbed.setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)\n\n${customWelcomeText}`);
+        // 커스텀 멘트일 때 제목은 기본으로, 멘트는 description에
+        welcomeEmbed.setTitle(customWelcomeText);
+        welcomeEmbed.setDescription(null); 
+
     } else {
         // 기본 멘트 (초기 상태 또는 오류 시)
         welcomeEmbed.setTitle('새로운 멤버가 입장했어요!');
-        welcomeEmbed.setDescription(`유저 **${member.user.tag}** (<@${member.user.id}>)`);
+        // 기본 멘트일 경우 description 비움 (유저 정보는 필드로 들어갔음)
+        welcomeEmbed.setDescription(null); 
     }
 
-    // 서버에 입장한 시간과 계정 생성일 추가
+    // 서버에 입장한 시간과 계정 생성일 추가 (유저 정보 필드 뒤에 이어 붙임)
     welcomeEmbed.addFields(
         { name: '서버에 입장한 시간', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: true },
         { name: '계정 생성일', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>`, inline: true }
@@ -370,10 +376,8 @@ client.on('messageCreate', async message => {
                     `❌ 도배, 욕설, 성희롱, 성드립 등 불쾌감을 주는 채팅\n` +
                     `❌ 정치, 종교, 인종 등 사회적이슈 언급\n` +
                     `❌ 광고 및 개인SNS 홍보\n\n` +
-                    `(아래에 있는 이모지(${emojiInput}) 선택시 역할이 지급됩니다.)`
+                    `(아래에 있는 반응 선택시 역할이 지급됩니다.)`
                 )
-                .setTimestamp()
-                .setFooter({ text: '역할을 받으려면 이모지를 클릭하세요!' });
 
             const sentMessage = await channel.send({ embeds: [roleEmbed] });
             await sentMessage.react(reactionEmoji);
@@ -398,15 +402,15 @@ client.on('messageCreate', async message => {
             message.reply('❌ 역할 메시지를 설정하는 중 오류가 발생했습니다. ID와 권한을 확인해주세요.');
         }
     }
-    // !입장멘트 활성화/비활성화
-    else if (command === '입장멘트') {
+    // !입장로그 활성화/비활성화
+    else if (command === '입장로그') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
         const parsedArgs = args.map(arg => arg.replace(/^"|"$/g, ''));
         if (parsedArgs.length < 1) {
-            return message.reply('❌ 사용법: `!입장멘트 <활성화/비활성화>`');
+            return message.reply('❌ 사용법: `!입장로그 <활성화/비활성화>`');
         }
 
         const action = parsedArgs[0].toLowerCase();
@@ -414,27 +418,27 @@ client.on('messageCreate', async message => {
             if (!settings[guildId]) settings[guildId] = {};
             settings[guildId].welcomeMessageEnabled = true;
             saveSettings();
-            message.reply('✅ 입장 멘트가 활성화되었습니다. 이제부터 새 멤버가 입장하면 로그 채널에 메시지를 보냅니다.');
+            message.reply('✅ 입장로그가 활성화되었습니다. 이제부터 새 멤버가 입장하면 로그 채널에 메시지를 보냅니다.');
         } else if (action === '비활성화' || action === 'off') {
             if (!settings[guildId]) settings[guildId] = {};
             settings[guildId].welcomeMessageEnabled = false;
             saveSettings();
-            message.reply('✅ 입장 멘트가 비활성화되었습니다.');
+            message.reply('✅ 입장로그가 비활성화되었습니다.');
         } else {
             return message.reply('❌ 유효한 옵션이 아닙니다. `활성화` 또는 `비활성화`를 사용해주세요.');
         }
     }
-    // !입장멘트수정 <새 멘트> 명령어
-    else if (command === '입장멘트수정') {
+    // !입장로그수정 <새 멘트> 명령어
+    else if (command === '입장로그수정') {
         if (!message.member.permissions.has('Administrator')) {
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
         const newContent = args.join(' ').trim();
         if (newContent.length === 0) {
-            return message.reply('❌ 사용법: `!입장멘트수정 <새로운 입장 멘트 또는 "몇번째">`\n' +
+            return message.reply('❌ 사용법: `!입장로그수정 <새로운 입장 멘트 또는 몇번째>`\n' +
                                  '`{user}`는 멤버 멘션, `{tag}`는 멤버 태그로 대체됩니다.\n' +
-                                 '`"몇번째"`를 입력하면 몇 번째 멤버 기능이 활성화됩니다.');
+                                 '`몇번째`를 입력하면 몇 번째 멤버 기능이 활성화됩니다.');
         }
 
         if (!settings[guildId]) settings[guildId] = {};
@@ -442,11 +446,11 @@ client.on('messageCreate', async message => {
         if (newContent.toLowerCase() === '몇번째') {
             settings[guildId].memberCountInTitle = true;
             settings[guildId].welcomeMessageContent = null;
-            message.reply('✅ 입장 로그 제목이 `N번째 멤버가 입장했어요`로 표시됩니다.');
+            message.reply('✅ 입장로그 제목이 `N번째 멤버가 입장했어요`로 표시됩니다.');
         } else {
             settings[guildId].memberCountInTitle = false;
             settings[guildId].welcomeMessageContent = newContent;
-            message.reply(`✅ 입장 멘트가 다음과 같이 수정되었습니다:\n\`\`\`${newContent}\`\`\`\n(예: ${newContent.replace(/{user}/g, message.author.toString()).replace(/{tag}/g, message.author.tag)})`);
+            message.reply(`✅ 입장로그가 다음과 같이 수정되었습니다:\n\`\`\`${newContent}\`\`\`\n`);
         }
         saveSettings();
     }
@@ -514,7 +518,7 @@ client.on('messageCreate', async message => {
         if (!settings[guildId]) settings[guildId] = {};
         settings[guildId].logChannelId = channel.id;
         saveSettings();
-        message.reply(`✅ 입장 로그 채널이 <#${channel.id}> (으)로 설정되었습니다.`);
+        message.reply(`✅ 입장로그 채널이 <#${channel.id}> (으)로 설정되었습니다.`);
     }
     // !help 명령어
     else if (command === 'help') {
@@ -533,25 +537,23 @@ client.on('messageCreate', async message => {
                 },
                 {
                     name: '📝 입장 로그/멘트 명령어',
-                    value: '`!입장멘트 <활성화/비활성화>`\n' +
+                    value: '`!입장로그 <활성화/비활성화>`\n' +
                            '  └ 새 멤버 입장 시 입장 멘트를 보낼지 설정합니다. (로그 기능 전체 활성화/비활성화)\n' +
-                           '`!입장멘트수정 <새로운 멘트 또는 "몇번째">`\n' +
+                           '`!입장로그수정 <새로운 멘트 또는 몇번째>`\n' +
                            '  └ 새 멤버 입장 시 보낼 멘트를 설정합니다.\n' +
                            '  └ `"{user}"`는 멤버 멘션, `"{tag}"`는 멤버 태그로 대체됩니다.\n' +
-                           '  └ `"몇번째"`를 입력하면 `N번째 멤버가 입장했어요` 형태로 표시됩니다.\n' +
+                           '  └ `몇번째`를 입력하면 `N번째 멤버가 입장했어요` 형태로 표시됩니다.\n' +
                            '`!초대자기능 <활성화/비활성화>`\n' +
                            '  └ 새 멤버 입장 시 초대자 정보를 표시할지 설정합니다.\n' +
                            '  └ 봇에게 `초대 보기` 권한이 필요합니다.\n' +
                            '`!입장로그채널 <채널ID 또는 #채널멘션>`\n' +
-                           '  └ 입장 멘트가 전송될 채널을 설정합니다.'
+                           '  └ 입장로그가 전송될 채널을 설정합니다.'
                 },
                 {
                     name: 'ℹ️ 기타',
                     value: '`!help`\n  └ 이 도움말을 표시합니다.'
                 }
             )
-            .setTimestamp()
-            .setFooter({ text: client.user.tag, iconURL: client.user.displayAvatarURL() });
 
         message.channel.send({ embeds: [helpEmbed] });
     }
