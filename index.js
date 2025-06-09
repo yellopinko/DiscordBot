@@ -261,8 +261,9 @@ client.on('guildMemberAdd', async member => {
             .replace(/{tag}/g, `**${member.user.tag}**`);   // 볼드체 적용
         
         // 커스텀 멘트일 때 제목은 기본으로, 멘트는 description에
-        welcomeEmbed.setTitle(`**새로운 멤버가 입장했어요!**`); 
-        welcomeEmbed.setDescription(`**${customWelcomeText}**`); // customWelcomeText 전체를 볼드체
+        welcomeEmbed.setTitle(`**${customWelcomeText}**`); // customWelcomeText 전체를 볼드체
+        welcomeEmbed.setDescription(null); 
+
     } else {
         // 기본 멘트 (초기 상태 또는 오류 시)
         welcomeEmbed.setTitle('**새로운 멤버가 입장했어요!**');
