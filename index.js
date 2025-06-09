@@ -453,14 +453,12 @@ client.on('messageCreate', async message => {
             .addFields(
                 { name: '**입장 로그 활성화**', value: welcomeMessageEnabledStatus, inline: true },
                 { name: '**로그 채널**', value: logChannelIdStatus, inline: true },
-                { name: '\u200B', value: '\u200B', inline: false },
-                { name: '**초대자 기능 활성화**', value: inviteTrackingEnabledStatus, inline: true },
-                { name: '**입장 멘트**', value: welcomeMessageContentStatus, inline: true },
+                { name: '\u200B', value: '\u200B', inline: true },
+                { name: '**초대자 기능 활성화**', value: inviteTrackingEnabledStatus, inline: false },
+                { name: '**입장 멘트**', value: welcomeMessageContentStatus, inline: false },
                 { name: '\u200B', value: '\u200B', inline: false },
                 { name: '**\'몇 번째 멤버\' 기능**', value: memberCountInTitleStatus, inline: false }
             )
-            .setTimestamp()
-            .setFooter({ text: '**봇 설정 상태**', iconURL: client.user.displayAvatarURL() });
 
         await message.channel.send({ embeds: [statusEmbed] });
         console.log(`[설정 상태] ${message.author.tag} 님이 ${message.guild.name} 서버의 설정 상태를 확인했습니다.`); // guild.name 대신 message.guild.name 사용
