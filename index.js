@@ -272,9 +272,17 @@ client.on('guildMemberAdd', async member => {
 
     // 서버에 입장한 시간과 계정 생성일 추가 (유저 정보 필드 뒤에 이어 붙임)
     welcomeEmbed.addFields(
-        { name: '서버에 입장한 시간', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: true },
-        { name: '계정 생성일', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>`, inline: true }
-    );
+    { 
+        name: '서버에 입장한 시간', 
+        value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, // R (상대적 시간)으로 변경
+        inline: false
+    },
+    { 
+        name: '계정 생성일', 
+        value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, // R (상대적 시간)으로 변경
+        inline: false
+    }
+);
 
     // 초대자 기능 활성화 시에만 초대자 섹션 추가
     if (guildSettings.inviteTrackingEnabled) {
