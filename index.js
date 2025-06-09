@@ -193,12 +193,12 @@ client.on('guildMemberAdd', async member => {
 
     const logChannel = guild.channels.cache.get(guildSettings.logChannelId);
     if (!logChannel || logChannel.type !== 0) {
-        console.log(`[입장 로그] ${guild.name} 서버의 로그 채널 (${guildSettings.logChannelId})을 찾을 수 없거나 텍스트 채널이 아닙니다.`);
+        console.log(`[입장 로그] ${guild.name} 서버의 **로그 채널** (**${guildSettings.logChannelId}**)을 찾을 수 없거나 **텍스트 채널이 아닙니다**.`);
         return;
     }
 
-    let inviterTag = '알 수 없음';
-    let inviterMention = '알 수 없음';
+    let inviterTag = '**알 수 없음**';
+    let inviterMention = '**알 수 없음**';
 
     if (guildSettings.inviteTrackingEnabled) {
         try {
@@ -225,77 +225,78 @@ client.on('guildMemberAdd', async member => {
             saveInviteTracker();
 
             if (foundInviter) {
-                inviterTag = foundInviter.username || foundInviter.tag; // .username이 더 최신
-                inviterMention = `<@${foundInviter.id}>`;
+                inviterTag = `**${foundInviter.username || foundInviter.tag}**`; // .username이 더 최신
+                inviterMention = `**<@${foundInviter.id}>**`; // 멘션 자체에 볼드체 적용 시도
             } else {
-                inviterTag = '초대자를 찾을 수 없음';
-                inviterMention = '초대자를 찾을 수 없음';
+                inviterTag = '**초대자를 찾을 수 없음**';
+                inviterMention = '**초대자를 찾을 수 없음**';
             }
 
         } catch (error) {
             console.error('[오류] 초대 추적 중 오류:', error);
-            inviterTag = '초대 정보를 가져올 수 없음';
-            inviterMention = '초대 정보를 가져올 수 없음';
+            inviterTag = '**초대 정보를 가져올 수 없음**';
+            inviterMention = '**초대 정보를 가져올 수 없음**';
         }
     }
 
     const welcomeEmbed = new EmbedBuilder()
         .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setTimestamp() // 메시지 전송 시간 표시
+        .setFooter({ text: '**환영합니다!**', iconURL: guild.iconURL() || client.user.displayAvatarURL() });
 
     // '유저' 정보는 항상 필드로 추가 (가장 위로 이동)
     welcomeEmbed.addFields(
-        { name: '유저', value: `<@${member.user.id}> (${member.user.tag})`, inline: false } // @유저 (유저) 형식
+        { name: '**유저**', value: `**<@${member.user.id}>** (**${member.user.tag}**)`, inline: false } // @유저 (유저) 형식
     );
 
     // 1. '몇 번째 멤버' 기능 활성화 여부에 따른 타이틀 및 설명 설정
     if (guildSettings.memberCountInTitle) {
-        welcomeEmbed.setTitle(`${guild.memberCount}번째 멤버가 입장했어요`);
+        welcomeEmbed.setTitle(`**${guild.memberCount}번째 멤버가 입장했어요**`);
         // 몇 번째 멤버일 경우, description은 비워둡니다 (유저 정보는 이미 필드로 들어갔음).
         welcomeEmbed.setDescription(null); 
     } else if (guildSettings.welcomeMessageContent) {
         // 커스텀 입장 멘트가 있을 경우 (몇 번째 멤버 기능 비활성화 시)
         const customWelcomeText = guildSettings.welcomeMessageContent
-            .replace(/{user}/g, `<@${member.user.id}>`)
-            .replace(/{tag}/g, member.user.tag);
+            .replace(/{user}/g, `**<@${member.user.id}>**`) // 볼드체 적용
+            .replace(/{tag}/g, `**${member.user.tag}**`);   // 볼드체 적용
         
         // 커스텀 멘트일 때 제목은 기본으로, 멘트는 description에
-        welcomeEmbed.setTitle(customWelcomeText);
-        welcomeEmbed.setDescription(null); 
-
+        welcomeEmbed.setTitle(`**새로운 멤버가 입장했어요!**`); 
+        welcomeEmbed.setDescription(`**${customWelcomeText}**`); // customWelcomeText 전체를 볼드체
     } else {
         // 기본 멘트 (초기 상태 또는 오류 시)
-        welcomeEmbed.setTitle('새로운 멤버가 입장했어요!');
+        welcomeEmbed.setTitle('**새로운 멤버가 입장했어요!**');
         // 기본 멘트일 경우 description 비움 (유저 정보는 필드로 들어갔음)
         welcomeEmbed.setDescription(null); 
     }
 
     // 서버에 입장한 시간과 계정 생성일 추가 (유저 정보 필드 뒤에 이어 붙임)
-welcomeEmbed.addFields(
-    { 
-        name: '서버에 입장한 시간', 
-        value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f> (<t:${Math.floor(member.joinedTimestamp / 1000)}:R>)`, 
-        inline: false
-    },
-    { 
-        name: '계정 생성일', 
-        value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:f> (<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>)`, 
-        inline: false
-    }
-);
+    welcomeEmbed.addFields(
+        { 
+            name: '**서버에 입장한 시간**', 
+            value: `**<t:${Math.floor(member.joinedTimestamp / 1000)}:f>** (**<t:${Math.floor(member.joinedTimestamp / 1000)}:R>**)`, 
+            inline: false
+        },
+        { 
+            name: '**계정 생성일**', 
+            value: `**<t:${Math.floor(member.user.createdTimestamp / 1000)}:f>** (**<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>**)`, 
+            inline: false
+        }
+    );
 
     // 초대자 기능 활성화 시에만 초대자 섹션 추가
     if (guildSettings.inviteTrackingEnabled) {
         welcomeEmbed.addFields(
-            { name: '초대자', value: `${inviterMention} (${inviterTag})`, inline: false } // @유저 (유저) 형식
+            { name: '**초대자**', value: `${inviterMention} (${inviterTag})`, inline: false } // @유저 (유저) 형식
         );
     }
 
     try {
         await logChannel.send({ embeds: [welcomeEmbed] });
-        console.log(`[입장 로그] ${member.user.tag} 님의 입장 메시지를 ${logChannel.name} 에 전송했습니다.`);
+        console.log(`[입장 로그] **${member.user.tag}** 님의 입장 메시지를 **${logChannel.name}** 에 전송했습니다.`);
     } catch (error) {
-        console.error(`[오류] 입장 메시지 전송 실패 (채널: ${logChannel.name}):`, error);
+        console.error(`[오류] 입장 메시지 전송 실패 (**채널**: ${logChannel.name}):`, error);
     }
 });
 
