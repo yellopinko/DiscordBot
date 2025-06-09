@@ -225,8 +225,9 @@ client.on('guildMemberAdd', async member => {
             saveInviteTracker();
 
             if (foundInviter) {
-                inviterTag = `**${foundInviter.username || foundInviter.tag}**`; // .username이 더 최신
-                inviterMention = `**<@${foundInviter.id}>**`; // 멘션 자체에 볼드체 적용 시도
+                // 유저네임(display name) 우선, 없으면 globalName, 그것도 없으면 tag 사용
+                inviterTag = `**${foundInviter.username || foundInviter.globalName || foundInviter.tag}**`; 
+                inviterMention = `**<@${foundInviter.id}>**`; 
             } else {
                 inviterTag = '**초대자를 찾을 수 없음**';
                 inviterMention = '**초대자를 찾을 수 없음**';
@@ -242,10 +243,12 @@ client.on('guildMemberAdd', async member => {
     const welcomeEmbed = new EmbedBuilder()
         .setColor(0xBF8EEF) // 푸터 색상을 연보라색 (bf8eef)으로 변경 요청 반영
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setTimestamp() // 메시지 전송 시간 표시
+        .setFooter({ text: '**환영합니다!**', iconURL: guild.iconURL() || client.user.displayAvatarURL() });
 
     // '유저' 정보는 항상 필드로 추가 (가장 위로 이동)
     welcomeEmbed.addFields(
-        { name: '**유저**', value: `**<@${member.user.id}>** (**${member.user.tag}**)`, inline: false } // @유저 (유저) 형식
+        { name: '**유저**', value: `**<@${member.user.id}>** (**${member.user.username || member.user.globalName || member.user.tag}**)`, inline: false } // @유저 (유저) 형식
     );
 
     // 1. '몇 번째 멤버' 기능 활성화 여부에 따른 타이틀 및 설명 설정
