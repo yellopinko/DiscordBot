@@ -784,6 +784,9 @@ client.on('messageReactionRemove', async (reaction, user) => {
 client.once('ready', async () => {
     logger.info(`[봇 준비] Logged in as ${client.user.tag}!`);
 
+    const LOG_CHANNEL_ID = '1382444613477990511'; // <-- !!! 여기에 아까 복사한 채널 ID를 붙여넣으세요 !!!
+    logger.addDiscordTransport(client, LOG_CHANNEL_ID); // 로거에 Discord 트랜스포트 추가
+
     // 각 서버의 초대 정보를 캐시 (봇이 시작될 때 한 번)
     for (const guild of client.guilds.cache.values()) {
         // 봇이 '서버 관리' 권한이 있는지 확인
