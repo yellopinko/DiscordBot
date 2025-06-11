@@ -127,7 +127,7 @@ function saveInviteTracker() {
 // 봇이 잠시 동안 반응 제거 이벤트를 무시할 수 있도록 하는 플래그
 client.ignoringReactionRemoves = new Set();
 
-loadAllData(); // 봇 시작 시 모든 데이터 로드
+// loadAllData(); // 봇 시작 시 모든 데이터 로드
 
 // 봇이 Discord에 성공적으로 로그인하고 준비되었을 때 실행되는 이벤트
 client.on('ready', async () => {
