@@ -127,6 +127,8 @@ function saveInviteTracker() {
 // 봇이 잠시 동안 반응 제거 이벤트를 무시할 수 있도록 하는 플래그
 client.ignoringReactionRemoves = new Set();
 
+loadAllData(); // 봇 시작 시 모든 데이터 로드
+
 // 봇이 Discord에 성공적으로 로그인하고 준비되었을 때 실행되는 이벤트
 client.on('ready', async () => {
     logger.info(`[봇 준비] Logged in as ${client.user.tag}!`);
@@ -781,8 +783,6 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // 봇이 준비되었을 때 실행될 이벤트 (로그인 이후 한 번만 실행)
 client.once('ready', async () => {
     logger.info(`[봇 준비] Logged in as ${client.user.tag}!`);
-
-    loadAllData(); // 봇 시작 시 모든 데이터 로드
 
     // 각 서버의 초대 정보를 캐시 (봇이 시작될 때 한 번)
     for (const guild of client.guilds.cache.values()) {
