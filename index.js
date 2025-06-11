@@ -3,6 +3,8 @@
 // .env 파일에서 환경 변수를 로드합니다. 이 코드는 파일 최상단에 위치해야 합니다.
 require('dotenv').config();
 
+// Winston 로거 모듈을 불러옵니다.
+const logger = require('./logger'); // <-- 이 줄을 추가합니다.
 // 파일 시스템 모듈을 불러옵니다.
 const fs = require('fs');
 // 경로 모듈을 불러옵니다.
@@ -47,14 +49,14 @@ function loadReactionRoles() {
         try {
             const data = fs.readFileSync(REACTION_ROLES_FILE, 'utf8');
             reactionRoles = JSON.parse(data);
-            console.log('[파일 로드] reactionRoles.json 로드 성공.');
+            logger.info('[파일 로드] reactionRoles.json 로드 성공.');
         } catch (error) {
-            console.error('[오류] reactionRoles 정보 로드 중 오류:', error);
+            logger.error('[오류] reactionRoles 정보 로드 중 오류:', error);
             reactionRoles = {};
         }
     } else {
         reactionRoles = {};
-        console.log('[파일 로드] reactionRoles.json 파일이 없어 빈 객체로 초기화합니다.');
+        logger.warn('[파일 로드] reactionRoles.json 파일이 없어 빈 객체로 초기화합니다.');
     }
 }
 
@@ -62,9 +64,9 @@ function loadReactionRoles() {
 function saveReactionRoles() {
     try {
         fs.writeFileSync(REACTION_ROLES_FILE, JSON.stringify(reactionRoles, null, 4), 'utf8');
-        console.log('[파일 저장] reactionRoles.json 저장 성공.');
+        logger.info('[파일 저장] reactionRoles.json 저장 성공.');
     } catch (error) {
-        console.error('[오류] reactionRoles 정보 저장 중 오류:', error);
+        logger.error('[오류] reactionRoles 정보 저장 중 오류:', error);
     }
 }
 
@@ -74,14 +76,14 @@ function loadSettings() {
         try {
             const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
             settings = JSON.parse(data);
-            console.log('[파일 로드] settings.json 로드 성공.');
+            logger.info('[파일 로드] settings.json 로드 성공.');
         } catch (error) {
-            console.error('[오류] settings 정보 로드 중 오류:', error);
+            logger.error('[오류] settings 정보 로드 중 오류:', error);
             settings = {};
         }
     } else {
         settings = {};
-        console.log('[파일 로드] settings.json 파일이 없어 빈 객체로 초기화합니다.');
+        logger.warn('[파일 로드] settings.json 파일이 없어 빈 객체로 초기화합니다.');
     }
 }
 
@@ -89,9 +91,9 @@ function loadSettings() {
 function saveSettings() {
     try {
         fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 4), 'utf8');
-        console.log('[파일 저장] settings.json 저장 성공.');
+        logger.info('[파일 저장] settings.json 저장 성공.');
     } catch (error) {
-        console.error('[오류] settings 정보 저장 중 오류:', error);
+        logger.error('[오류] settings 정보 저장 중 오류:', error);
     }
 }
 
@@ -101,14 +103,14 @@ function loadInviteTracker() {
         try {
             const data = fs.readFileSync(INVITE_TRACKER_FILE, 'utf8');
             inviteTracker = JSON.parse(data);
-            console.log('[파일 로드] inviteTracker.json 로드 성공.');
+            logger.info('[파일 로드] inviteTracker.json 로드 성공.');
         } catch (error) {
-            console.error('[오류] inviteTracker 정보 로드 중 오류:', error);
+            logger.error('[오류] inviteTracker 정보 로드 중 오류:', error);
             inviteTracker = {};
         }
     } else {
         inviteTracker = {};
-        console.log('[파일 로드] inviteTracker.json 파일이 없어 빈 객체로 초기화합니다.');
+        logger.warn('[파일 로드] inviteTracker.json 파일이 없어 빈 객체로 초기화합니다.');
     }
 }
 
@@ -116,9 +118,9 @@ function loadInviteTracker() {
 function saveInviteTracker() {
     try {
         fs.writeFileSync(INVITE_TRACKER_FILE, JSON.stringify(inviteTracker, null, 4), 'utf8');
-        console.log('[파일 저장] inviteTracker.json 저장 성공.');
+        logger.info('[파일 저장] inviteTracker.json 저장 성공.');
     } catch (error) {
-        console.error('[오류] inviteTracker 정보 저장 중 오류:', error);
+        logger.error('[오류] inviteTracker 정보 저장 중 오류:', error);
     }
 }
 
@@ -127,8 +129,8 @@ client.ignoringReactionRemoves = new Set();
 
 // 봇이 Discord에 성공적으로 로그인하고 준비되었을 때 실행되는 이벤트
 client.on('ready', async () => {
-    console.log(`[봇 준비] Logged in as ${client.user.tag}!`);
-    console.log('[봇 준비] 봇이 성공적으로 준비되었습니다!');
+    logger.info(`[봇 준비] Logged in as ${client.user.tag}!`);
+    logger.info('[봇 준비] 봇이 성공적으로 준비되었습니다!');
 
     // 봇 시작 시 저장된 데이터 로드
     loadReactionRoles();
@@ -146,10 +148,10 @@ client.on('ready', async () => {
                     inviterId: invite.inviter ? invite.inviter.id : null
                 };
             });
-            console.log(`[초대 추적] ${guild.name} 서버의 초대 정보 캐시 성공.`);
+            logger.info(`[초대 추적] ${guild.name} 서버의 초대 정보 캐시 성공.`);
             saveInviteTracker(); // 초기 캐시된 정보 저장
         } catch (error) {
-            console.error(`[오류] ${guild.name} 서버의 초대 정보를 가져오는 데 실패했습니다 (권한 부족?):`, error);
+            logger.error(`[오류] ${guild.name} 서버의 초대 정보를 가져오는 데 실패했습니다 (권한 부족?):`, error);
         }
     }
 });
@@ -166,7 +168,7 @@ client.on('inviteCreate', invite => {
         inviterId: invite.inviter ? invite.inviter.id : null
     };
     saveInviteTracker();
-    console.log(`[초대 추적] 새 초대 생성: ${invite.code} (서버: ${invite.guild.name})`);
+    logger.info(`[초대 추적] 새 초대 생성: ${invite.code} (서버: ${invite.guild.name})`);
 });
 
 // 초대 삭제 시 초대 추적 정보 업데이트
@@ -176,7 +178,7 @@ client.on('inviteDelete', invite => {
     if (inviteTracker[invite.guild.id][invite.code]) {
         delete inviteTracker[invite.guild.id][invite.code];
         saveInviteTracker();
-        console.log(`[초대 추적] 초대 삭제: ${invite.code} (서버: ${invite.guild.name})`);
+        logger.info(`[초대 추적] 초대 삭제: ${invite.code} (서버: ${invite.guild.name})`);
     }
 });
 
@@ -187,13 +189,13 @@ client.on('guildMemberAdd', async member => {
 
     // 환영 메시지 기능이 비활성화되어 있거나 로그 채널이 설정되지 않았으면 리턴
     if (!guildSettings.welcomeMessageEnabled || !guildSettings.logChannelId) {
-        console.log(`[입장 로그] ${guild.name} 서버의 입장 로그 설정이 없거나 비활성화되어 있습니다.`);
+        logger.warn(`[입장 로그] ${guild.name} 서버의 입장 로그 설정이 없거나 비활성화되어 있습니다.`);
         return;
     }
 
     const logChannel = guild.channels.cache.get(guildSettings.logChannelId);
     if (!logChannel || logChannel.type !== 0) {
-        console.log(`[입장 로그] ${guild.name} 서버의 **로그 채널** (**${guildSettings.logChannelId}**)을 찾을 수 없거나 **텍스트 채널이 아닙니다**.`);
+        logger.warn(`[입장 로그] ${guild.name} 서버의 **로그 채널** (**${guildSettings.logChannelId}**)을 찾을 수 없거나 **텍스트 채널이 아닙니다**.`);
         return;
     }
 
@@ -234,7 +236,7 @@ client.on('guildMemberAdd', async member => {
             }
 
         } catch (error) {
-            console.error('[오류] 초대 추적 중 오류:', error);
+            logger.error('[오류] 초대 추적 중 오류:', error);
             inviterTag = '**초대 정보를 가져올 수 없음**';
             inviterMention = '**초대 정보를 가져올 수 없음**';
         }
@@ -294,9 +296,9 @@ client.on('guildMemberAdd', async member => {
 
     try {
         await logChannel.send({ embeds: [welcomeEmbed] });
-        console.log(`[입장 로그] **${member.user.tag}** 님의 입장 메시지를 **${logChannel.name}** 에 전송했습니다.`);
+        logger.info(`[입장 로그] **${member.user.tag}** 님의 입장 메시지를 **${logChannel.name}** 에 전송했습니다.`);
     } catch (error) {
-        console.error(`[오류] 입장 메시지 전송 실패 (**채널**: ${logChannel.name}):`, error);
+        logger.error(`[오류] 입장 메시지 전송 실패 (**채널**: ${logChannel.name}):`, error);
     }
 });
 
@@ -335,6 +337,7 @@ client.on('messageCreate', async message => {
     // !역할메시지 명령어
     if (command === '역할메시지') {
         if (!message.member.permissions.has('Administrator')) {
+            logger.warn(`[명령어] ${message.author.tag} (ID: ${message.author.id})이(가) 관리자 권한 없이 '!역할메시지' 사용 시도.`);
             return message.reply('이 명령어를 사용하려면 관리자 권한이 필요합니다.');
         }
 
@@ -376,6 +379,7 @@ client.on('messageCreate', async message => {
             }
 
             if (message.guild.members.me.roles.highest.position <= role.position) {
+                logger.warn(`[명령어] 봇 역할(<span class="math-inline">\{message\.guild\.members\.me\.roles\.highest\.name\}\)이 '</span>{role.name}' 역할보다 낮거나 같아서 역할 부여 실패.`); // <--- 이 줄 추가
                 return message.reply(`❌ 봇의 역할이 '${role.name}' 역할보다 낮거나 같아 해당 역할을 부여할 수 없습니다.\n` +
                                      `봇 역할의 순서를 '${role.name}' 역할보다 위로 옮겨주세요.`);
             }
@@ -416,10 +420,10 @@ client.on('messageCreate', async message => {
             saveReactionRoles();
 
             message.reply(`✅ 새로운 반응 역할 메시지가 <#${channel.id}> 채널에 성공적으로 생성되었습니다.`);
-            console.log(`[명령어] ${message.guild.name} 서버에 새 역할 메시지 생성: 채널 ${channelId}, 메시지 ${sentMessage.id}, 이모지 ${emojiInput}, 역할 ${role.id}`);
+            logger.info(`[명령어] ${message.guild.name} 서버에 새 역할 메시지 생성: 채널 ${channelId}, 메시지 ${sentMessage.id}, 이모지 ${emojiInput}, 역할 ${role.id}`);
 
         } catch (error) {
-            console.error('[오류] 역할 메시지 설정 중 오류:', error);
+            logger.error('[오류] 역할 메시지 설정 중 오류:', error);
             message.reply('❌ 역할 메시지를 설정하는 중 오류가 발생했습니다. ID와 권한을 확인해주세요.');
         }
     }
@@ -461,7 +465,7 @@ client.on('messageCreate', async message => {
             )
 
         await message.channel.send({ embeds: [statusEmbed] });
-        console.log(`[설정 상태] ${message.author.tag} 님이 ${message.guild.name} 서버의 설정 상태를 확인했습니다.`); // guild.name 대신 message.guild.name 사용
+        logger.info(`[설정 상태] ${message.author.tag} 님이 ${message.guild.name} 서버의 설정 상태를 확인했습니다.`); // guild.name 대신 message.guild.name 사용
     }
 
     // 이 아래에 다른 기존 명령어 처리 if 문들이 있을 수 있습니다.
@@ -549,7 +553,7 @@ client.on('messageCreate', async message => {
                 saveInviteTracker();
                 message.channel.send('🌐 기존 서버 초대 정보가 성공적으로 갱신되었습니다.');
             } catch (error) {
-                console.error('[오류] 초대자 추적 활성화 시 초대 정보 갱신 실패:', error);
+                logger.error('[오류] 초대자 추적 활성화 시 초대 정보 갱신 실패:', error);
                 message.reply('❌ 초대자 추적 기능 활성화 시 초대 정보 갱신에 실패했습니다. 봇에게 `초대 보기` 권한이 있는지 확인해주세요.');
             }
 
@@ -630,7 +634,7 @@ client.on('messageCreate', async message => {
         message.channel.send({ embeds: [helpEmbed] });
     }
     else {
-        console.log(`[메시지 감지] 알 수 없는 명령어: ${command}`);
+        logger.info(`[메시지 감지] 알 수 없는 명령어: ${command}`);
     }
 });
 
@@ -642,7 +646,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
         try {
             await reaction.fetch();
         } catch (error) {
-            console.error('[오류] 반응 부분 로드 중 오류:', error);
+            logger.error('[오류] 반응 부분 로드 중 오류:', error);
             return;
         }
     }
@@ -669,26 +673,26 @@ client.on('messageReactionAdd', async (reaction, user) => {
                 try {
                     member = await guild.members.fetch(user.id);
                 } catch (error) {
-                    console.error('[오류] 멤버 정보 가져오기 실패:', error);
+                    logger.error('[오류] 멤버 정보 가져오기 실패:', error);
                     return;
                 }
 
                 const role = guild.roles.cache.get(entry.roleId);
 
                 if (!role) {
-                    console.log(`[반응 추가 감지] 설정된 역할 (${entry.roleId})을 찾을 수 없습니다.`);
+                    logger.info(`[반응 추가 감지] 설정된 역할 (${entry.roleId})을 찾을 수 없습니다.`);
                     return;
                 }
 
                 if (!member.roles.cache.has(role.id)) {
                     try {
                         await member.roles.add(role);
-                        console.log(`[반응 추가 감지] ${member.user.tag} 에게 '${role.name}' 역할 부여 성공!`);
+                        logger.info(`[반응 추가 감지] ${member.user.tag} 에게 '${role.name}' 역할 부여 성공!`);
                     } catch (error) {
-                        console.error(`[오류] ${member.user.tag} 에게 '${role.name}' 역할 부여 중 오류:`, error);
+                        logger.error(`[오류] ${member.user.tag} 에게 '${role.name}' 역할 부여 중 오류:`, error);
                     }
                 } else {
-                    console.log(`[반응 추가 감지] ${member.user.tag} 은(는) 이미 '${role.name}' 역할을 가지고 있습니다.`);
+                    logger.info(`[반응 추가 감지] ${member.user.tag} 은(는) 이미 '${role.name}' 역할을 가지고 있습니다.`);
                 }
 
                 try {
@@ -699,7 +703,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
                         client.ignoringReactionRemoves.delete(uniqueId);
                     }, 1000);
                 } catch (error) {
-                    console.error(`[오류] ${member.user.tag} 의 반응 제거 중 오류:`, error);
+                    logger.error(`[오류] ${member.user.tag} 의 반응 제거 중 오류:`, error);
                 }
             }
         }
@@ -711,7 +715,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
 client.on('messageReactionRemove', async (reaction, user) => {
     const uniqueId = reaction.message.id + user.id + reaction.emoji.name + (reaction.emoji.id || '');
     if (client.ignoringReactionRemoves.has(uniqueId)) {
-        console.log(`[반응 제거 감지] 봇에 의해 제거된 반응(${uniqueId})이므로 역할 제거를 건너뜁니다.`);
+        logger.info(`[반응 제거 감지] 봇에 의해 제거된 반응(${uniqueId})이므로 역할 제거를 건너뜁니다.`);
         return;
     }
 
@@ -721,7 +725,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
         try {
             await reaction.fetch();
         } catch (error) {
-            console.error('[오류] 반응 부분 로드 중 오류:', error);
+            logger.error('[오류] 반응 부분 로드 중 오류:', error);
             return;
         }
     }
@@ -748,36 +752,65 @@ client.on('messageReactionRemove', async (reaction, user) => {
                 try {
                     member = await guild.members.fetch(user.id);
                 } catch (error) {
-                    console.error('[오류] 멤버 정보 가져오기 실패:', error);
+                    logger.error('[오류] 멤버 정보 가져오기 실패:', error);
                     return;
                 }
 
                 const role = guild.roles.cache.get(entry.roleId);
 
                 if (!role) {
-                    console.log(`[반응 제거 감지] 설정된 역할 (${entry.roleId})을 찾을 수 없습니다.`);
+                    logger.info(`[반응 제거 감지] 설정된 역할 (${entry.roleId})을 찾을 수 없습니다.`);
                     return;
                 }
 
                 if (member.roles.cache.has(role.id)) {
                     try {
                         await member.roles.remove(role);
-                        console.log(`[반응 제거 감지] ${member.user.tag} 에게 '${role.name}' 역할 제거 성공!`);
+                        logger.info(`[반응 제거 감지] ${member.user.tag} 에게 '${role.name}' 역할 제거 성공!`);
                     } catch (error) {
-                        console.error(`[오류] ${member.user.name} 에게 '${role.name}' 역할 제거 중 오류:`, error);
+                        logger.error(`[오류] ${member.user.name} 에게 '${role.name}' 역할 제거 중 오류:`, error);
                     }
                 } else {
-                     console.log(`[반응 제거 감지] ${member.user.tag} 은(는) 이미 '${role.name}' 역할을 가지고 있지 않습니다.`);
+                     logger.info(`[반응 제거 감지] ${member.user.tag} 은(는) 이미 '${role.name}' 역할을 가지고 있지 않습니다.`);
                 }
             }
         }
     }
 });
 
+// 봇이 준비되었을 때 실행될 이벤트 (로그인 이후 한 번만 실행)
+client.once('ready', async () => {
+    logger.info(`[봇 준비] Logged in as ${client.user.tag}!`);
+
+    loadAllData(); // 봇 시작 시 모든 데이터 로드
+
+    // 각 서버의 초대 정보를 캐시 (봇이 시작될 때 한 번)
+    for (const guild of client.guilds.cache.values()) {
+        // 봇이 '서버 관리' 권한이 있는지 확인
+        if (guild.members.me.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+            try {
+                const invites = await guild.invites.fetch();
+                inviteTracker[guild.id] = invites.map(invite => ({ code: invite.code, uses: invite.uses }));
+                logger.info(`[초대 추적] ${guild.name} 서버의 초대 정보 로드 완료.`);
+            } catch (error) {
+                logger.error(`[오류] ${guild.name} 서버의 초대 정보 로드 중 오류: %s`, error.message);
+            }
+        } else {
+            logger.warn(`[초대 추적] ${guild.name} 서버에서 '서버 관리' 권한이 없어 초대 정보를 로드할 수 없습니다.`);
+        }
+    }
+    saveInviteTracker(); // 초기 로드 후 저장
+});
 
 // 봇을 Discord API에 로그인시킵니다.
-console.log('[로그인 시도] 봇 토큰으로 로그인 시도 중...');
+logger.info('[로그인 시도] 봇 토큰으로 로그인 시도 중...');
 client.login(TOKEN).catch(error => {
-    console.error('[오류] 봇 로그인 실패:', error);
-    console.error('토큰이 유효한지, .env 파일에 DISCORD_BOT_TOKEN이 올바르게 설정되었는지, 인터넷 연결이 되어있는지 확인해주세요.');
+    logger.error('[오류] 봇 로그인 실패:', error);
+});
+
+// 봇을 Discord API에 로그인시킵니다.
+logger.info('[로그인 시도] 봇 토큰으로 로그인 시도 중...');
+client.login(TOKEN).catch(error => {
+    logger.error('[오류] 봇 로그인 실패:', error);
+    logger.error('토큰이 유효한지, .env 파일에 DISCORD_BOT_TOKEN이 올바르게 설정되었는지, 인터넷 연결이 되어있는지 확인해주세요.');
 });
